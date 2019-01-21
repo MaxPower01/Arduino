@@ -51,8 +51,8 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   
   pinMode(BUTTON_RED, INPUT);
-  pinMode(BUTTON_WHITE, INPUT);
-  pinMode(BUTTON_YELLOW, INPUT);
+  // pinMode(BUTTON_WHITE, INPUT);
+  // pinMode(BUTTON_YELLOW, INPUT);
 
   pinMode(SOUND_SENSOR_1, INPUT);
   // pinMode(SOUND_SENSOR_2, INPUT);
