@@ -1,5 +1,14 @@
 #include <Arduino.h>
 
+// 1. Variables
+// 2. Setup
+// 3. Fonctions
+// 4. Loop
+
+/* ============================================================ *\ 
+|  ==============> 1. Variables
+\* ============================================================ */ 
+
 const int BUTTON = 2;
 bool buttonPressed = false;
 bool systemArmed = true;

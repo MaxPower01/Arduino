@@ -69,9 +69,7 @@ void setup() {
   }
 }
 
-/* ============================================================ *\ 
-|  ==============> 3. Fonctions
-\* ============================================================ */
+
 
 void armSystem() {
   delay(1000);
@@ -136,9 +134,9 @@ void monitorAverage() {
     for (int i = 0; i < INPUTS; i++) {
       if (average[i] >= SENSITIVITY) {
         digitalWrite(LED_BUILTIN, HIGH);
-
+        
         systemArmed = false;
-
+        
         Serial.print("Un son d'une intensité de ");
         Serial.print(average[i]);
         Serial.print(" a été détecté par le capteur #");

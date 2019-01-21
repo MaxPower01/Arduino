@@ -1,27 +1,76 @@
 #include <Arduino.h>
-#include <SevSeg.h>
 
+// 1. Variables
+// 2. Setup
+// 3. Fonctions
+// 4. Loop
+
+/* ============================================================ *\ 
+|  ==============> 1. Variables
+\* ============================================================ */ 
+
+const int AMBIENT_LIGHT = A5;
+
+const int BUTTON_RED = 2;
+
+const int SENSITIVITY = 40;
+
+int ambientLight;
+
+bool buttonRed = false;
+bool systemArmed = false;
+
+/* ============================================================ *\ 
+|  ==============> 2. Setup
+\* ============================================================ */ 
 
 void setup() {
   Serial.begin(9600);
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(2, OUTPUT);
-  pinMode(3, OUTPUT);
-  pinMode(4, OUTPUT);
+  pinMode(AMBIENT_LIGHT, INPUT);
+
 }
 
-void loop() {
-  digitalWrite(2, HIGH);
-  digitalWrite(3, HIGH);
-  digitalWrite(4, HIGH);
-  digitalWrite(LED_BUILTIN, HIGH);
+/* ============================================================ *\ 
+|  ==============> 3. Fonctions
+\* ============================================================ */
 
+void armSystem() {
   delay(1000);
-
-  digitalWrite(2, LOW);
-  digitalWrite(3, LOW);
-  digitalWrite(4, LOW);
   digitalWrite(LED_BUILTIN, LOW);
+  systemArmed = true;
+}
+
+void checkButtons() {
+  // Vérifie si un bouton est appuyé :
+  if (digitalRead(BUTTON_RED) == HIGH) {
+    buttonRed = true;
+  } else {
+    buttonRed = false;
+  }
+
+  // Actions à effectuer si un bouton est appuyé :
+  if (buttonRed) {
+    armSystem();
+  }
+}
+
+/* ============================================================ *\ 
+|  ==============> 4. Loop
+\* ============================================================ */ 
+
+void loop() {
+  checkButtons();
   
-  delay(1000);
+  ambientLight = analogRead(AMBIENT_LIGHT);
+  
+  if (systemArmed) {
+    if (ambientLight < SENSITIVITY) {
+      digitalWrite(LED_BUILTIN, HIGH);
+      systemArmed = false;
+      Serial.println("Alarme déclenchée");
+    }
+  }
+
+  delay(1);
 }
