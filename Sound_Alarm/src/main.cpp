@@ -2,7 +2,7 @@
 
 // 1. Variables
 // 2. Setup
-// 3. Fonctions
+// 3. Methods
 // 4. Loop
 
 /* ============================================================ *\ 
@@ -14,54 +14,55 @@ const int BUTTON_WHITE = 3;
 const int BUTTON_YELLOW = 4;
 
 const int SOUND_SENSOR_1 = A0;
-// const int SOUND_SENSOR_2 = A1;
+const int SOUND_SENSOR_2 = A1;
 const int SOUND_SENSOR_3 = A2;
 const int SOUND_SENSOR_4 = A3;
-// const int SOUND_SENSOR_5 = A4;
+const int SOUND_SENSOR_5 = A4;
 const int SOUND_SENSOR_6 = A5;
-
-const int INPUTS = 4;
-// const int INPUTS = 6;             // Nombre d'entrées
-const int READINGS = 20;          // Nombre d'échantillons à prendre en compte
-const int SENSITIVITY = 1;        // Niveau de sensibilité de la détection sonore
-
-const byte inputPins[INPUTS] = {A0, A2, A3, A5};
-// const byte inputPins[INPUTS] = {A0, A1, A2, A3, A4, A5};
-
-int readings[INPUTS][READINGS];   // Lectures provenant des capteurs
-int readIndex[INPUTS] = {0, 0};   // Index de la lecture en cours
-int total[INPUTS] = {0, 0};       // Total
-int average[INPUTS] = {0, 0};     // Moyenne
 
 bool buttonRed = false;
 bool buttonWhite = false;
 bool buttonYellow = false;
 
 bool systemArmed = false;
+bool alarm = false;
+int alarmLevel = 0;
+
+// Liste des capteurs :
+const int INPUTS = 6;
+const byte inputPins[INPUTS] = {A0, A1, A2, A3, A4, A5};
+
+const int READINGS = 20;          // Nombre d'échantillons à prendre en compte
+
+int threshold = 1;                // Niveau de sensibilité de la détection
+
+int readings[INPUTS][READINGS];   // Lectures provenant des capteurs
+int readIndex[INPUTS] = {0, 0};   // Index de la lecture en cours
+
+int total[INPUTS] = {0, 0};       // Somme des échantillons
+int average[INPUTS] = {0, 0};     // Moyenne des échantillons
 
 /* ============================================================ *\ 
 |  ==============> 2. Setup
 \* ============================================================ */ 
 
 void setup() {
-  // Initialises la communication à un débit de 9600 bits/seconde :
+  // Initialisation de la communication à un débit de 9600 bits/seconde :
   Serial.begin(9600);
 
-  // Établis le mode de chacune des pattes utilisées :
+  // Définition du mode de chacune des pattes utilisées :
   pinMode(LED_BUILTIN, OUTPUT);
-  
   pinMode(BUTTON_RED, INPUT);
-  // pinMode(BUTTON_WHITE, INPUT);
-  // pinMode(BUTTON_YELLOW, INPUT);
-
+  pinMode(BUTTON_WHITE, INPUT);
+  pinMode(BUTTON_YELLOW, INPUT);
   pinMode(SOUND_SENSOR_1, INPUT);
-  // pinMode(SOUND_SENSOR_2, INPUT);
+  pinMode(SOUND_SENSOR_2, INPUT);
   pinMode(SOUND_SENSOR_3, INPUT);
   pinMode(SOUND_SENSOR_4, INPUT);
-  // pinMode(SOUND_SENSOR_5, INPUT);
+  pinMode(SOUND_SENSOR_5, INPUT);
   pinMode(SOUND_SENSOR_6, INPUT);
 
-  // Initialises toutes les lectures d'échantillons à 0 :
+  // Initialisation de toutes les lectures d'échantillons à 0 :
   for (int i = 0; i < INPUTS; i++) {
     for (int thisReading = 0; thisReading < READINGS; thisReading++) {
       readings[i][thisReading] = 0;
@@ -69,7 +70,9 @@ void setup() {
   }
 }
 
-
+/* ============================================================ *\ 
+|  ==============> 4. Methods
+\* ============================================================ */ 
 
 void armSystem() {
   delay(1000);
@@ -78,7 +81,6 @@ void armSystem() {
 }
 
 void checkButtons() {
-  // Vérifie si un bouton est appuyé :
   if (digitalRead(BUTTON_RED) == HIGH) {
     buttonRed = true;
   } else {
@@ -96,52 +98,53 @@ void checkButtons() {
   } else {
     buttonYellow = false;
   }
-
-  // Actions à effectuer si un bouton est appuyé :
-  if (buttonRed) {
-    armSystem();
-  }
 }
 
-// Permet d'établir la moyenne d'un nombre "READINGS" d'échantillons :
-void averageReadings() {
+void averageSamples() {
   for (int i = 0; i < INPUTS; i++) {
-    // Soustrais la dernière lecture :
+    // Soustraction de la dernière lecture :
     total[i] = total[i] - readings[i][readIndex[i]];
 
-    // Lis un échantillon provenant du capteur :
+    // Lecture d'un échantillon provenant du capteur :
     readings[i][readIndex[i]] = analogRead(inputPins[i]);
 
-    // Ajoutes cet échantillon au total :
+    // Ajout de cet échantillon au total :
     total[i] = total[i] + readings[i][readIndex[i]];
 
-    // Avances à la position suivante dans le tableau :
+    // On passe à la position suivante :
     readIndex[i] = readIndex[i] + 1;
 
-    // Si nous sommes à la fin du tableau, retournes au début :
+    // Si on est à la fin du tableau, on recommence :
     if (readIndex[i] >= READINGS) {
       readIndex[i] = 0;
     }
 
-    // Calcules la moyenne des échantillons :
+    // Calcul de la moyenne des échantillons pour le capteur "i" :
     average[i] = total[i] / READINGS;
   }
 }
 
-// Si le système est armé, une moyenne d'échantillons plus forte que "SENSITIVITY" déclenche l'alarme :
-void monitorAverage() {
-  if (systemArmed) {
-    for (int i = 0; i < INPUTS; i++) {
-      if (average[i] >= SENSITIVITY) {
-        digitalWrite(LED_BUILTIN, HIGH);
-        
-        systemArmed = false;
-        
-        Serial.print("Un son d'une intensité de ");
-        Serial.print(average[i]);
-        Serial.print(" a été détecté par le capteur #");
-        Serial.println(i + 1);
-      }
+void flashLed(byte led) {
+    digitalWrite(led, HIGH);
+    delay(250);
+    digitalWrite(led, LOW);
+    delay(250);
+}
+
+void triggerAlarm() {
+  for(int i = 0; i < alarmLevel; i++) {
+    flashLed(LED_BUILTIN);
+  }
+}
+
+void watch() {
+  for (int i = 0; i < INPUTS; i++) {
+    if (average[i] >= threshold && systemArmed) {
+      // Le niveau d'alarme augmente à chaque fois qu'un son est détecté pendant que le système est armé :
+      systemArmed = false;
+      alarmLevel = alarmLevel + 1;
+      triggerAlarm();
+      systemArmed = true;
     }
   }
 }
@@ -153,9 +156,15 @@ void monitorAverage() {
 void loop() {
   checkButtons();
 
-  averageReadings();
+  if (buttonRed) {
+    armSystem();
+  }
 
-  monitorAverage();
+  averageSamples();
+  
+  watch();
+
+  flashLed(LED_BUILTIN);
 
   // Donne un peu de repos à la boucle :
   delay(1);
