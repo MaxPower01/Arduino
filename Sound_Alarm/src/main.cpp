@@ -9,10 +9,12 @@
 |  ==============> 1. Variables
 \* ============================================================ */ 
 
+// Boutons :
 const int BUTTON_RED = 2;
 const int BUTTON_WHITE = 3;
 const int BUTTON_YELLOW = 4;
 
+// Capteurs de son :
 const int SOUND_SENSOR_1 = A0;
 const int SOUND_SENSOR_2 = A1;
 const int SOUND_SENSOR_3 = A2;
@@ -20,27 +22,30 @@ const int SOUND_SENSOR_4 = A3;
 const int SOUND_SENSOR_5 = A4;
 const int SOUND_SENSOR_6 = A5;
 
+// État des boutons :
 bool buttonRed = false;
 bool buttonWhite = false;
 bool buttonYellow = false;
 
+// Système d'alarme :
 bool systemArmed = false;
 bool alarm = false;
 int alarmLevel = 0;
 
-// Liste des capteurs :
+// Moyenne d'échantillons :
 const int INPUTS = 6;
 const byte inputPins[INPUTS] = {A0, A1, A2, A3, A4, A5};
 
 const int READINGS = 20;          // Nombre d'échantillons à prendre en compte
-
 int threshold = 1;                // Niveau de sensibilité de la détection
-
 int readings[INPUTS][READINGS];   // Lectures provenant des capteurs
 int readIndex[INPUTS] = {0, 0};   // Index de la lecture en cours
-
 int total[INPUTS] = {0, 0};       // Somme des échantillons
 int average[INPUTS] = {0, 0};     // Moyenne des échantillons
+
+
+
+
 
 /* ============================================================ *\ 
 |  ==============> 2. Setup
@@ -69,6 +74,10 @@ void setup() {
     }
   }
 }
+
+
+
+
 
 /* ============================================================ *\ 
 |  ==============> 4. Methods
@@ -137,7 +146,7 @@ void triggerAlarm() {
   }
 }
 
-void watch() {
+void watchSamples() {
   for (int i = 0; i < INPUTS; i++) {
     if (average[i] >= threshold && systemArmed) {
       // Le niveau d'alarme augmente à chaque fois qu'un son est détecté pendant que le système est armé :
@@ -148,6 +157,10 @@ void watch() {
     }
   }
 }
+
+
+
+
 
 /* ============================================================ *\ 
 |  ==============> 4. Loop
@@ -161,11 +174,9 @@ void loop() {
   }
 
   averageSamples();
-  
-  watch();
+  watchSamples();
 
   flashLed(LED_BUILTIN);
 
-  // Donne un peu de repos à la boucle :
   delay(1);
 }
