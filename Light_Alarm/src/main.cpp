@@ -10,15 +10,9 @@
 \* ============================================================ */ 
 
 const int AMBIENT_LIGHT = A5;
-
-const int BUTTON_RED = 2;
-
-const int SENSITIVITY = 40;
+const int SENSITIVITY = 200;
 
 int ambientLight;
-
-bool buttonRed = false;
-bool systemArmed = false;
 
 /* ============================================================ *\ 
 |  ==============> 2. Setup
@@ -35,13 +29,7 @@ void setup() {
 |  ==============> 3. Fonctions
 \* ============================================================ */
 
-void armSystem() {
-  delay(1000);
-  digitalWrite(LED_BUILTIN, LOW);
-  systemArmed = true;
-}
-
-void checkButtons() {
+/* void checkButtons() {
   // Vérifie si un bouton est appuyé :
   if (digitalRead(BUTTON_RED) == HIGH) {
     buttonRed = true;
@@ -53,24 +41,23 @@ void checkButtons() {
   if (buttonRed) {
     armSystem();
   }
-}
+} */
 
 /* ============================================================ *\ 
 |  ==============> 4. Loop
 \* ============================================================ */ 
 
 void loop() {
-  checkButtons();
-  
   ambientLight = analogRead(AMBIENT_LIGHT);
   
-  if (systemArmed) {
-    if (ambientLight < SENSITIVITY) {
-      digitalWrite(LED_BUILTIN, HIGH);
-      systemArmed = false;
-      Serial.println("Alarme déclenchée");
-    }
+  if (ambientLight < SENSITIVITY) {
+    digitalWrite(LED_BUILTIN, HIGH);
+    Serial.println(ambientLight);
+    delay(1000);
+    digitalWrite(LED_BUILTIN, LOW);
   }
 
-  delay(1);
+  Serial.println(ambientLight);
+
+  delay(10);
 }
