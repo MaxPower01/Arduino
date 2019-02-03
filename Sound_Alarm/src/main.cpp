@@ -10,31 +10,32 @@
 \* ============================================================ */ 
 
 // Boutons :
-const int BUTTON_RED = 2;
-const int BUTTON_WHITE = 3;
-const int BUTTON_YELLOW = 4;
+const int BUTTON_RED = 13;
 
 // Capteurs de son :
 const int SOUND_SENSOR_1 = A0;
 const int SOUND_SENSOR_2 = A1;
 const int SOUND_SENSOR_3 = A2;
-const int SOUND_SENSOR_4 = A3;
-const int SOUND_SENSOR_5 = A4;
-const int SOUND_SENSOR_6 = A5;
+const int SOUND_SENSOR_4 = A4;
+const int SOUND_SENSOR_5 = A5;
+
+// Lumières LED :
+const int LED_GREEN = 2;
+const int LED_BLUE = 3;
+const int LED_RED = 4;
 
 // État des boutons :
 bool buttonRed = false;
-bool buttonWhite = false;
-bool buttonYellow = false;
 
 // Système d'alarme :
 bool systemArmed = false;
 bool alarm = false;
-int alarmLevel = 0;
+int alarmLevel = 1;
+int previonsAlarmLevel;
 
 // Moyenne d'échantillons :
-const int INPUTS = 6;
-const byte inputPins[INPUTS] = {A0, A1, A2, A3, A4, A5};
+const int INPUTS = 5;
+const byte inputPins[INPUTS] = {A0, A1, A2, A4, A5};
 
 const int READINGS = 20;          // Nombre d'échantillons à prendre en compte
 int threshold = 1;                // Niveau de sensibilité de la détection
@@ -57,15 +58,18 @@ void setup() {
 
   // Définition du mode de chacune des pattes utilisées :
   pinMode(LED_BUILTIN, OUTPUT);
+
+  pinMode(LED_GREEN, OUTPUT);
+  pinMode(LED_BLUE, OUTPUT);
+  pinMode(LED_RED, OUTPUT);
+  
   pinMode(BUTTON_RED, INPUT);
-  pinMode(BUTTON_WHITE, INPUT);
-  pinMode(BUTTON_YELLOW, INPUT);
+
   pinMode(SOUND_SENSOR_1, INPUT);
   pinMode(SOUND_SENSOR_2, INPUT);
   pinMode(SOUND_SENSOR_3, INPUT);
   pinMode(SOUND_SENSOR_4, INPUT);
   pinMode(SOUND_SENSOR_5, INPUT);
-  pinMode(SOUND_SENSOR_6, INPUT);
 
   // Initialisation de toutes les lectures d'échantillons à 0 :
   for (int i = 0; i < INPUTS; i++) {
@@ -85,8 +89,18 @@ void setup() {
 
 void armSystem() {
   delay(1000);
-  digitalWrite(LED_BUILTIN, LOW);
-  systemArmed = true;
+
+  if (alarmLevel >= 4) {
+    digitalWrite(LED_BUILTIN, HIGH);
+    digitalWrite(2, LOW);
+    digitalWrite(3, LOW);
+    digitalWrite(4, LOW);
+    systemArmed = true;
+    alarmLevel = 1;
+  } else {
+    digitalWrite(LED_BUILTIN, HIGH);
+    systemArmed = true;
+  }
 }
 
 void checkButtons() {
@@ -94,18 +108,6 @@ void checkButtons() {
     buttonRed = true;
   } else {
     buttonRed = false;
-  }
-
-  if (digitalRead(BUTTON_WHITE) == HIGH) {
-    buttonWhite = true;
-  } else {
-    buttonWhite = false;
-  }
-
-  if (digitalRead(BUTTON_YELLOW) == HIGH) {
-    buttonYellow = true;
-  } else {
-    buttonYellow = false;
   }
 }
 
@@ -140,20 +142,31 @@ void flashLed(byte led) {
     delay(250);
 }
 
-void triggerAlarm() {
-  for(int i = 0; i < alarmLevel; i++) {
-    flashLed(LED_BUILTIN);
-  }
+void triggerAlarm(int led) {
+  int previousLed = led - 1;
+
+  digitalWrite(LED_BUILTIN, LOW);
+
+  digitalWrite(led, HIGH);
+  digitalWrite(previousLed, LOW);
 }
 
 void watchSamples() {
   for (int i = 0; i < INPUTS; i++) {
     if (average[i] >= threshold && systemArmed) {
+
       // Le niveau d'alarme augmente à chaque fois qu'un son est détecté pendant que le système est armé :
+      Serial.println(average[i]);
+
       systemArmed = false;
+
       alarmLevel = alarmLevel + 1;
-      triggerAlarm();
-      systemArmed = true;
+
+      Serial.println();
+
+      Serial.println(alarmLevel);
+      
+      triggerAlarm(alarmLevel);
     }
   }
 }
@@ -174,9 +187,8 @@ void loop() {
   }
 
   averageSamples();
-  watchSamples();
 
-  flashLed(LED_BUILTIN);
+  watchSamples();
 
   delay(1);
 }
