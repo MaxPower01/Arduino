@@ -10,7 +10,8 @@
 \* ============================================================ */ 
 
 // Boutons :
-const int BUTTON_RED = 13;
+const int BUTTON_RED = 12;
+bool buttonRed = false;
 
 // Capteurs de son :
 const int SOUND_SENSOR_1 = A0;
@@ -24,14 +25,10 @@ const int LED_GREEN = 2;
 const int LED_BLUE = 3;
 const int LED_RED = 4;
 
-// État des boutons :
-bool buttonRed = false;
-
 // Système d'alarme :
 bool systemArmed = false;
 bool alarm = false;
 int alarmLevel = 1;
-int previonsAlarmLevel;
 
 // Moyenne d'échantillons :
 const int INPUTS = 5;
@@ -88,16 +85,21 @@ void setup() {
 \* ============================================================ */ 
 
 void armSystem() {
-  delay(1000);
 
   if (alarmLevel >= 4) {
-    digitalWrite(LED_BUILTIN, HIGH);
     digitalWrite(2, LOW);
     digitalWrite(3, LOW);
     digitalWrite(4, LOW);
+    
+    delay(1000);
+    
+    digitalWrite(LED_BUILTIN, HIGH);
+    
     systemArmed = true;
     alarmLevel = 1;
+
   } else {
+    delay(1000);
     digitalWrite(LED_BUILTIN, HIGH);
     systemArmed = true;
   }
@@ -106,6 +108,7 @@ void armSystem() {
 void checkButtons() {
   if (digitalRead(BUTTON_RED) == HIGH) {
     buttonRed = true;
+    
   } else {
     buttonRed = false;
   }
