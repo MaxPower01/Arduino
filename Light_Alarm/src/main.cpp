@@ -24,6 +24,9 @@ const int LIGHT_SENSOR = A5;
 
 int light;
 
+// Laser :
+const int LASER = 8;
+
 // Système d'alarme :
 bool systemArmed = false;
 
@@ -32,7 +35,7 @@ int alarmLevel = 1;
 
 // Moyenne d'échantillons :
 const int READINGS = 3;     // Nombre d'échantillons à prendre en compte
-const int THRESHOLD = 190;  // Niveau de sensibilité de la détection
+const int THRESHOLD = 750;  // Niveau de sensibilité de la détection
 
 int readings[READINGS];     // Lectures provenant des capteurs
 int readIndex = 0;          // Index de la lecture en cours
@@ -59,7 +62,10 @@ void setup() {
   pinMode(LED_RED, OUTPUT);
   
   pinMode(BUTTON_RED, INPUT);
+
   pinMode(LIGHT_SENSOR, INPUT);
+
+  pinMode(LASER, OUTPUT);
 }
 
 
@@ -71,7 +77,6 @@ void setup() {
 \* ============================================================ */
 
 void armSystem() {
-
   if (alarmLevel >= 4) {
     digitalWrite(2, LOW);
     digitalWrite(3, LOW);
@@ -122,8 +127,8 @@ void averageSamples() {
 void triggerAlarm(int led) {
   int previousLed = led - 1;
 
+  digitalWrite(LASER, LOW);
   digitalWrite(LED_BUILTIN, LOW);
-
   digitalWrite(led, HIGH);
   digitalWrite(previousLed, LOW);
 }
@@ -137,13 +142,15 @@ void triggerAlarm(int led) {
 \* ============================================================ */ 
 
 void loop() {
-  light = analogRead(LIGHT_SENSOR);
 
   checkButtons();
 
   if (buttonRed) {
+    digitalWrite(LASER, HIGH);
     armSystem();
   }
+  
+  light = analogRead(LIGHT_SENSOR);
 
   // Établissement de la moyenne :
   // averageSamples();
