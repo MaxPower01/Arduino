@@ -34,10 +34,10 @@ bool alarm = false;
 int alarmLevel = 1;
 
 // Moyenne d'échantillons :
-const int READINGS = 3;     // Nombre d'échantillons à prendre en compte
+const int SMOOTHNESS = 3;     // Nombre d'échantillons à prendre en compte
 const int THRESHOLD = 750;  // Niveau de sensibilité de la détection
 
-int readings[READINGS];     // Lectures provenant des capteurs
+int readings[SMOOTHNESS];     // Lectures provenant des capteurs
 int readIndex = 0;          // Index de la lecture en cours
 int total = 0;              // Somme des échantillons
 int average = 0;            // Moyenne des échantillons
@@ -105,7 +105,7 @@ void checkButtons() {
   }
 }
 
-void averageSamples() {
+void smoothing() {
     // subtract the last reading:
   total = total - readings[readIndex];
   // read from the sensor:
@@ -116,12 +116,12 @@ void averageSamples() {
   readIndex = readIndex + 1;
 
   // if we're at the end of the array...
-  if (readIndex >= READINGS) {
+  if (readIndex >= SMOOTHNESS) {
     // ...wrap around to the beginning:
     readIndex = 0;
   }
 
-  average = total / READINGS;
+  average = total / SMOOTHNESS;
 }
 
 void triggerAlarm(int led) {
