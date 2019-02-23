@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include <RH_ASK.h>
+#include <SPI.h> // Not actually used but needed to compile
 
 // 1. Variables
 // 2. Setup
@@ -9,9 +11,11 @@
 |  ==============> 1. Variables
 \* ============================================================ */ 
 
+RH_ASK driver;
+
 // Boutons :
-const int BUTTON_RED = 12;
-bool buttonRed = false;
+const int BUTTON = 8;
+bool button = false;
 
 // Capteurs de son :
 const int SOUND_SENSOR_1 = A0;
@@ -20,7 +24,7 @@ const int SOUND_SENSOR_3 = A3;
 const int SOUND_SENSOR_4 = A5;
 
 // Lumières LED :
-const int LED_BLUE = 2;
+const int LED_GREEN = 5;
 const int LED_YELLOW = 3;
 const int LED_RED = 4;
 
@@ -28,7 +32,7 @@ const int LED_RED = 4;
 bool systemArmed = false;
 bool alarm = false;
 
-int warningLevel = 1;
+int warningLevel = 0;
 
 // Moyenne d'échantillons :
 const int INPUTS = 5;
@@ -37,7 +41,9 @@ const byte inputPins[INPUTS] = {A0, A2, A3, A5};
 
 const int SMOOTHNESS = 20;          // Nombre d'échantillons à prendre en compte
 
-const int THRESHOLD = 1;                // Niveau de sensibilité de la détection
+int threshold = 2;
+int minThreshold = 1;
+int maxThreshold = 100;                // Niveau de sensibilité de la détection
 
 int readings[INPUTS][SMOOTHNESS];   // Lectures provenant des capteurs
 int readIndex[INPUTS] = {0, 0};   // Index de la lecture en cours
@@ -60,7 +66,7 @@ void setup() {
   pinMode(LED_YELLOW, OUTPUT);
   pinMode(LED_RED, OUTPUT);
   
-  pinMode(BUTTON_RED, INPUT);
+  pinMode(BUTTON, INPUT);
 
   pinMode(SOUND_SENSOR_1, INPUT);
   pinMode(SOUND_SENSOR_2, INPUT);
@@ -68,11 +74,10 @@ void setup() {
   pinMode(SOUND_SENSOR_4, INPUT);
 
   // Initialisation de toutes les lectures d'échantillons à 0 :
-  for (int i = 0; i < INPUTS; i++) {
-    for (int thisReading = 0; thisReading < SMOOTHNESS; thisReading++) {
-      readings[i][thisReading] = 0;
-    }
-  }
+  resetReadings();
+
+  if (!driver.init())
+         Serial.println("init failed");
 }
 
 
@@ -83,34 +88,33 @@ void setup() {
 |  ==============> 3. Methods
 \* ============================================================ */ 
 
-void armSystem() {
-
-  if (warningLevel >= 4) {
-    digitalWrite(2, LOW);
-    digitalWrite(3, LOW);
-    digitalWrite(4, LOW);
-    
-    delay(1000);
-    
-    digitalWrite(LED_BUILTIN, HIGH);
-    
-    systemArmed = true;
-    warningLevel = 1;
-
-  } else {
-    delay(1000);
-    digitalWrite(LED_BUILTIN, HIGH);
-    systemArmed = true;
+void resetReadings() {
+  for (int i = 0; i < INPUTS; i++) {
+    for (int thisReading = 0; thisReading < SMOOTHNESS; thisReading++) {
+      readings[i][thisReading] = 0;
+    }
   }
+}
+
+void armSystem() {
+  delay(1000);
+  systemArmed = true;
+}
+
+
+
+void disarmSystem() {
+  systemArmed = false;
+  delay(1000);
 }
 
 
 
 void checkButtons() {
-  if (digitalRead(BUTTON_RED) == HIGH) {
-    buttonRed = true;
+  if (digitalRead(BUTTON) == HIGH) {
+    button = true;
   } else {
-    buttonRed = false;
+    button = false;
   }
 }
 
@@ -162,6 +166,62 @@ void triggerAlarm(int led) {
 
 
 
+void watchSamples() {
+  for (int i = 0; i < INPUTS; i++) {
+    if (average[i] >= threshold && systemArmed) {
+
+      // Le niveau d'alarme augmente à chaque fois qu'un son est détecté pendant que le système est armé :
+      Serial.print("Warning triggerred : ");
+      Serial.println(average[i]);
+
+      disarmSystem();
+
+      warningLevel = warningLevel + 1;      
+    }
+  }
+}
+
+
+
+void warn() {
+  Serial.println(warningLevel);
+
+  switch (warningLevel)
+      {
+        case 1:
+          digitalWrite(LED_GREEN, HIGH);
+          digitalWrite(LED_YELLOW, LOW);
+          digitalWrite(LED_RED, LOW);
+          break;
+        
+        case 2:
+          digitalWrite(LED_GREEN, LOW);
+          digitalWrite(LED_YELLOW, HIGH);
+          break;
+
+        case 3:
+          digitalWrite(LED_YELLOW, LOW);
+          digitalWrite(LED_RED, HIGH);
+          break;
+
+        case 4:
+          digitalWrite(LED_GREEN, HIGH);
+          digitalWrite(LED_YELLOW, HIGH);
+          digitalWrite(LED_RED, HIGH);
+          const char *msg = "Hello World!";
+          driver.send((uint8_t *)msg, strlen(msg));
+          driver.waitPacketSent();
+          delay(1000);
+          warningLevel = 0;
+          break;
+      
+        default:
+          break;
+      }
+}
+
+
+
 
 
 /* ============================================================ *\ 
@@ -171,57 +231,28 @@ void triggerAlarm(int led) {
 void loop() {
   checkButtons();
 
-  if (buttonRed) {
+  if (button) {
     armSystem();
   }
 
-  smoothing();
-
-  for (int i = 0; i < INPUTS; i++) {
-    if (average[i] >= THRESHOLD && systemArmed) {
-
-      // Le niveau d'alarme augmente à chaque fois qu'un son est détecté pendant que le système est armé :
-      Serial.println(average[i]);
-
-      systemArmed = false;
-
-      warningLevel = warningLevel + 1;
-
-      Serial.println();
-
-      Serial.println(warningLevel);      
+  if (systemArmed) {
+    for(int i = 0; i < INPUTS; i++)
+    {
+      if(analogRead(inputPins[i]) > threshold) {
+        warningLevel = warningLevel + 1;      
+        warn();
+        delay(1000);
+        return;
+      }
     }
   }
+  
 
-  switch (warningLevel)
-      {
-        case 1:
-          digitalWrite(LED_BLUE, LOW);
-          digitalWrite(LED_YELLOW, LOW);
-          digitalWrite(LED_RED, LOW);
-          break;
-        
-        case 2:
-          digitalWrite(LED_BLUE, HIGH);
-          break;
-        
-        case 3:
-          digitalWrite(LED_BLUE, LOW);
-          digitalWrite(LED_YELLOW, HIGH);
-          break;
+  // smoothing();
 
-        case 4:
-          digitalWrite(LED_YELLOW, LOW);
-          digitalWrite(LED_RED, HIGH);
-          break;
+  // watchSamples();
 
-        case 4:
-          // Trigger alarm
-          break;
-      
-        default:
-          break;
-      }
+  // warn();
 
-  delay(1);
+  delay(10);
 }

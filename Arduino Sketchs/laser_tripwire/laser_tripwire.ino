@@ -1,4 +1,3 @@
-#include <Arduino.h>
 #include <RH_ASK.h>
 #include <SPI.h> // Not actually used but needed to compile
 
@@ -83,10 +82,12 @@ void loop() {
   // Activation ou désactivation du fil de déclenchement au laser :
   if (digitalRead(BUTTON) == HIGH && systemArmed == false)
   {
+    Serial.println("arm system");
     armSystem();
   }
   else if (digitalRead(BUTTON) == HIGH && systemArmed == true)
   {
+    Serial.println("disarm system");
     disarmSystem();
   }
 

@@ -1,4 +1,3 @@
-#include <Arduino.h>
 #include <RH_ASK.h>
 #include <SPI.h> // Not actualy used but needed to compile
 
@@ -7,14 +6,7 @@ RH_ASK driver;
 const int BLUE_LED = 7;
 const int RED_LED = 8;
 
-const int BUZZER = 5;
-
 int alarm = 0;
-bool alarmSound = false;
-
-
-
-
 
 void setup() {
   Serial.begin(9600); // Debugging only
@@ -26,10 +18,6 @@ void setup() {
     Serial.println("init failed");  
   }
 }
-
-
-
-
 
 void loop() {
   uint8_t buf[12];
@@ -43,13 +31,11 @@ void loop() {
     Serial.print("Message: ");
     Serial.println((char*)buf);
 
-    // alarmSound = true;
-
-    alarm = alarm + 1;
-    
-    // if (alarm >= 4) {
-    //   alarm = 0;
-    // }
+    if (alarm < 2) {
+      alarm = alarm + 1;
+    } else if (alarm >= 2) {
+      alarm = 0;
+    }
 
     switch (alarm)
     {
@@ -67,22 +53,9 @@ void loop() {
         digitalWrite(BLUE_LED, LOW);
         digitalWrite(RED_LED, HIGH);
         break;
-
-      case 3:
-        digitalWrite(BLUE_LED, HIGH);
-        digitalWrite(RED_LED, HIGH);
-        alarmSound = true;
-        break;
     
       default:
         break;
     }
-  }
-
-  if (alarmSound == true) {
-    digitalWrite(BUZZER, LOW);
-    delay(500);
-    digitalWrite(BUZZER, HIGH);
-    delay(500);
   }
 }
