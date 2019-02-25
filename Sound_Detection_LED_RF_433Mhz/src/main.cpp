@@ -15,10 +15,6 @@
 
 RH_ASK driver;
 
-const int PIN_RED = 11;
-const int PIN_GREEN = 10;
-const int PIN_BLUE = 9;
-
 // Boutons :
 const int BUTTON = 8;
 bool button = false;
@@ -28,6 +24,11 @@ const int SOUND_SENSOR_1 = A0;
 const int SOUND_SENSOR_2 = A2;
 const int SOUND_SENSOR_3 = A3;
 const int SOUND_SENSOR_4 = A5;
+
+// LED RGB Common Anode
+const int PIN_RED = 9;
+const int PIN_GREEN = 10;
+const int PIN_BLUE = 11;
 
 // Système d'alarme :
 bool systemArmed = false;
@@ -182,6 +183,8 @@ void setColor(int red, int green, int blue)
 
 
 void warn() {
+
+
   Serial.println(warningLevel);
 
   switch (warningLevel)
@@ -192,6 +195,10 @@ void warn() {
 
         case 1:
           setColor(255, 255, 0);  // yellow
+          const char *msg = "Hello World!";
+          driver.send((uint8_t *)msg, strlen(msg));
+          driver.waitPacketSent();
+          delay(1000);
           break;
         
         case 2:
@@ -203,20 +210,10 @@ void warn() {
           break;
 
         case 4:
-          setColor(255, 255, 255);
-          const char *msg = "Hello World!";
-          driver.send((uint8_t *)msg, strlen(msg));
-          driver.waitPacketSent();
-          delay(1000);
-          driver.send((uint8_t *)msg, strlen(msg));
-          driver.waitPacketSent();
-          delay(1000);
-          driver.send((uint8_t *)msg, strlen(msg));
-          driver.waitPacketSent();
-          delay(1000);
-          driver.send((uint8_t *)msg, strlen(msg));
-          driver.waitPacketSent();
-          delay(1000);
+          digitalWrite(PIN_RED, LOW); 
+          digitalWrite(PIN_GREEN, LOW); 
+          digitalWrite(PIN_BLUE, LOW); 
+          
           break;
       
         default:
@@ -233,26 +230,30 @@ void warn() {
 \* ============================================================ */ 
 
 void loop() {
+            
   checkButtons();
 
   if (button) {
     armSystem();
   }
 
-  // smoothing();
-  // watchSamples();
-
   if (systemArmed) {
     for(int i = 0; i < INPUTS; i++)
     {
       if(analogRead(inputPins[i]) > threshold) {
         warningLevel = warningLevel + 1;      
+        Serial.println(warningLevel);
         warn();
-        delay(10000);
+        delay(1000);
         return;
       }
     }
   }
   
+
+  // smoothing();
+
+  // watchSamples();
+
   delay(10);
 }

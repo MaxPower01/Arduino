@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include <RH_ASK.h>
 #include <SPI.h> // Not actually used but needed to compile
 
@@ -12,7 +13,8 @@
 
 RH_ASK driver;
 
-const int BUTTON = 5;
+const int BUTTON_SYSTEM = 5;  // Turns on/off the system when pressed
+const int BUTTON_SWITCH = 6;  // Prevents alarm from going while pressed
 
 const int LIGHT_SENSOR = A5;
 int light;
@@ -43,7 +45,8 @@ void setup() {
 
   // Définition du mode de chacune des pattes utilisées :
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(BUTTON, INPUT);
+  pinMode(BUTTON_SYSTEM, INPUT);
+  pinMode(BUTTON_SWITCH, INPUT);
   pinMode(LASER, OUTPUT);
   pinMode(LIGHT_SENSOR, INPUT);
 }
@@ -80,21 +83,19 @@ void loop() {
   
   
   // Activation ou désactivation du fil de déclenchement au laser :
-  if (digitalRead(BUTTON) == HIGH && systemArmed == false)
+  if (digitalRead(BUTTON_SYSTEM) == HIGH && systemArmed == false)
   {
-    Serial.println("arm system");
     armSystem();
   }
-  else if (digitalRead(BUTTON) == HIGH && systemArmed == true)
+  else if (digitalRead(BUTTON_SYSTEM) == HIGH && systemArmed == true)
   {
-    Serial.println("disarm system");
     disarmSystem();
   }
 
   light = analogRead(LIGHT_SENSOR);
   Serial.println(light);
 
-  if (light <= THRESHOLD && systemArmed)
+  if (light <= THRESHOLD && systemArmed && analogRead(BUTTON_SWITCH) == LOW);
   {
     const char *msg = "Hello World!";
     driver.send((uint8_t *)msg, strlen(msg));
