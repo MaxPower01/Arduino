@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <RH_ASK.h>
-#include <SPI.h> // Nécessaire seulement pour compiler le code
+#include <SPI.h> // Nécessaire seulement pour compiler le code.
 
 
 
@@ -9,9 +9,6 @@
   2. Setup
   3. Méthodes
   4. Loop
-    4.1. Activation ou désactivation du fil de déclenchement au laser
-    4.2. Lecture des données des capteurs
-    4.3. Déclenchement conditionnel de l'alarme
 */
 
 
@@ -22,26 +19,21 @@
 
 RH_ASK driver;
 
-const int BUTTON_MASTER = 5;
-const int BUTTON_SWITCH = 6;
-
-bool switchPressed = false;
-
-const int LIGHT_SENSOR = A5;
-int light;
-
-const int ROTATION_SENSOR = A1;
-int rotation = 0;
-
 const int LASER = 2;
+const int BUTTON_SWITCH = 5;
+const int BUTTON_ENABLE = 6;
+const int ROTATION_SENSOR = A1;
+const int LIGHT_SENSOR = A5;
 
+const int LIGHT_THRESHOLD = 100;
+const char *msg = "Hello world!";
+
+bool buttonEnable = false;
 bool systemArmed = false;
+bool rotationAccess = false;
 
-bool alarm = false;
-int alarmLevel = 1;
-
-// Niveau de sensibilité du capteur de lumière :
-const int THRESHOLD = 100;
+int light = 0;
+int rotation = 0;
 
 
 
@@ -52,18 +44,22 @@ const int THRESHOLD = 100;
 \* ============================================================ */ 
 
 void setup() {
-  // Initialisation de la communication à un débit de 9600 bits/seconde :
+  // Initialisation de la communication via le port série à un débit de 9600 bits/seconde.
   Serial.begin(9600);
 
-  // Initialisation de la communication radio
+  // Initialisation de la communication radio.
   if (!driver.init())
       Serial.println("init failed");
 
-  // Définition du mode de chacune des pattes utilisées :
-  pinMode(BUTTON_MASTER, INPUT);
+  pinMode(LED_BUILTIN, OUTPUT); // Degug only
+
   pinMode(BUTTON_SWITCH, INPUT);
+  pinMode(BUTTON_ENABLE, INPUT);
+
   pinMode(LASER, OUTPUT);
+
   pinMode(LIGHT_SENSOR, INPUT);
+
   pinMode(ROTATION_SENSOR, INPUT);
 }
 
@@ -76,33 +72,42 @@ void setup() {
 \* ============================================================ */
 
 void armSystem() {       
+  digitalWrite(LED_BUILTIN, HIGH);  // Degug only
   digitalWrite(LASER, HIGH);
-  delay(1000);
   systemArmed = true;
 }
 
+
 void disarmSystem() {
+  digitalWrite(LED_BUILTIN, LOW);  // Degug only
   systemArmed = false;
   digitalWrite(LASER, LOW);
 }
 
-void checkButtons() {
-  if (digitalRead(BUTTON_MASTER) == HIGH && systemArmed == false)
-  {
-    armSystem();
-  }
-  else if (digitalRead(BUTTON_MASTER) == HIGH && systemArmed == true)
-  {
-    disarmSystem();
-    delay(1000);
-  }
 
-  if (digitalRead(BUTTON_SWITCH) == HIGH) {
-    switchPressed = true;
-  } else {
-    switchPressed = false;
+void pauseSystem() {
+  digitalWrite(LED_BUILTIN, LOW);  // Degug only
+  light = LIGHT_THRESHOLD * 2;
+  digitalWrite(LASER, LOW);
+}
+
+
+void checkButtons() {
+  // Lorsque le bouton interrupteur est appuyé, le système s'active.
+
+}
+
+
+void checkSystem() {
+  if (systemArmed)
+  {
+    if (buttonEnable)
+    {
+      // Désactive le système.
+    }
   }
 }
+
 
 void checkRotation() {
   if (
@@ -141,64 +146,37 @@ void checkRotation() {
 \* ============================================================ */ 
 
 void loop() {
-  const char *msg = "Hello world!";
-  
-  rotation = analogRead(ROTATION_SENSOR);
-  
-  checkButtons();
-
-  while(systemArmed)
+  // Vérification de l'état du bouton #1.
+  if (digitalRead(BUTTON_SWITCH) == HIGH && systemArmed == false)
   {
+    armSystem();
+    delay(1000);
+  }
+  else if (digitalRead(BUTTON_SWITCH) == HIGH && systemArmed == true)
+  {
+    disarmSystem();
+    delay(1000);
+  }
 
-    while (digitalRead(BUTTON_SWITCH) == LOW)
+  if (systemArmed)
+  {
+    digitalWrite(LED_BUILTIN, HIGH);  // Degug only
+
+    while(digitalRead(BUTTON_ENABLE) == HIGH)
     {
-
-      if (light < THRESHOLD)
-      {
-        digitalWrite(LASER, HIGH);
-        delay(100);
-      }
-      
-      light = analogRead(LIGHT_SENSOR);
-
-      if (light <= THRESHOLD)
-      {
-        Serial.println("alarm");
-
-        driver.send((uint8_t *)msg, strlen(msg));
-        driver.waitPacketSent();
-        delay(1000);
-      }
-    }
-    while (digitalRead(BUTTON_SWITCH) == HIGH)
-    {
-      digitalWrite(LASER, LOW);
-      light = 1000;
+      pauseSystem();
     }
   }
-  
-
-  
-  
 
   // if (systemArmed)
   // {
-  //   if (rotationAccess)
+  //   rotation = analogRead(ROTATION_SENSOR);
+  //   light = analogRead(LIGHT_SENSOR);
+
+  //   if (light <= LIGHT_THRESHOLD)
   //   {
-  //     Serial.println("rotationAccess");
-  //     if (digitalRead(BUTTON_SWITCH) == HIGH) {
-  //       systemArmed = false;
-  //     }
-  //     else
-  //     {
-  //       systemArmed = true;
-  //       if (light <= THRESHOLD)
-  //       {
-  //       }
-  //     }
-  //   }
-  //   else if (light <= THRESHOLD)
-  //   {
+  //     Serial.println("Alarm");
+
   //     driver.send((uint8_t *)msg, strlen(msg));
   //     driver.waitPacketSent();
   //     delay(1000);
