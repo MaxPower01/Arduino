@@ -30,17 +30,15 @@
 
 RH_ASK driver;  // Communication radio  module RF 433Mhz.
 
-const int LED_GREEN = 5;
 const int LASER = 10;
 const int BUTTON_SWITCH = 2;
 const int BUTTON_ENABLE = 3;
-const int ROTATION_SENSOR = A1;
+const int ROTATION_SENSOR = A0;
 const int LIGHT_SENSOR = A5;
 
 
-const int ACTIVATION_DELAY = 100;
+const int ACTIVATION_DELAY = 2000;
 const int LIGHT_THRESHOLD = 100;
-const int ROTATION_THRESHOLD = 500;
 const char *msg = "Hello world!"; // Message à envoyer via le module RF 433Mhz.
 
 
@@ -48,8 +46,8 @@ bool systemArmed = false;
 bool rotationAccess = false;
 
 int counter = 0;
-int light;
-int rotation;
+int light = 0;
+int rotation = 0;
 
 
 
@@ -65,7 +63,6 @@ void setup() {
   if (!driver.init())
       Serial.println("init failed");
 
-  pinMode(LED_GREEN, OUTPUT);
   pinMode(BUTTON_SWITCH, INPUT);
   pinMode(BUTTON_ENABLE, INPUT);
 
@@ -93,6 +90,12 @@ void armSystem() {
 void disarmSystem() {
   systemArmed = false;
   digitalWrite(LASER, LOW);
+}
+
+
+void pauseSystem() {
+  digitalWrite(LASER, LOW);
+  counter = 0;
 }
 
 
@@ -138,61 +141,14 @@ void checkRotation() {
 \* ======================================================================================== */ 
 
 void loop() {
-  
-  // ------------------------------------------------------------------------------------->
-  
-  /* 
-    Si le système est éteint et que le bouton est appuyé, le système s'allume.
-    Si le système est allumé et que le bouton et appuyez, le système s’éteint.
-  */
-  
-  if (digitalRead(BUTTON_SWITCH) == HIGH && systemArmed == false)
+
+  if (digitalRead(BUTTON_ENABLE) == HIGH)
   {
-    armSystem();
-    delay(1000);
+    digitalWrite(LASER, LOW);
+    delay(100);
   }
-  else if (digitalRead(BUTTON_SWITCH) == HIGH && systemArmed == true)
+  else
   {
-    disarmSystem();
-    delay(1000);
-  }
-
-  // ------------------------------------------------------------------------------------->
-
-  /* 
-    Pendant que le système est armé, la variable "counter" incrémente de 1 à chaque boucle et les données du capteur de lumière sont lues.
-    Pendant que le bouton est appuyé, le système se met en pause et la variable “counter” est continuellement remise à 0.
-    Dès que le bouton est relâché, la variable “counter” recommence à s’incrémenter.
-    Le système d'alarme de plus de déclencher que lorsque la variable “counter” est supérieure à “ACTIVATION_DELAY”.
-    Cela permet de donner une certaine marge de manœuvre entre la réactivation du système lorsque le bouton n’est plus appuyé et le possible déclenchement de l’alarme.
-    L'alarme se déclenche dès que le bouton est relâché sans cette précaution.
-  */
-
-  if (systemArmed)
-  {
-    counter = counter + 1;
-
-    rotation = analogRead(ROTATION_SENSOR);
-    light = analogRead(LIGHT_SENSOR);
-
-    checkRotation();
-
-    // Mise en pause du système d'alarme :
-    while(digitalRead(BUTTON_ENABLE) == HIGH && rotation > ROTATION_THRESHOLD)
-    {
-      disarmSystem();
-      counter = 0;
-    }
-    
-    armSystem();
-    
-    // Déclenchement de l'alarme :
-    if (light <= LIGHT_THRESHOLD && counter > ACTIVATION_DELAY)
-    {
-      digitalWrite(LED_GREEN, HIGH); 
-      driver.send((uint8_t *)msg, strlen(msg));
-      driver.waitPacketSent();
-      delay(1000);
-    }
+    digitalWrite(LASER, HIGH);
   }
 }
