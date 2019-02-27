@@ -1,7 +1,13 @@
-#include <Arduino.h>
-#include <RH_ASK.h>
-#include <SPI.h> // Nécessaire seulement pour compiler le code.
+/* 
+  FIL DE DÉCLENCHEMENT AU LASER :
 
+  Le microcontrôleur gère un capteur de lumière et un laser qui pointe vers ce capteur.
+  Pour allumer ou éteindre le système (donc, le laser), il faut appuyer sur un bouton.
+  Lorsque le faisceau du laser est bloqué et que le capteur de lumière ne reçoit plus assez de lumière, un signal radio est émis.
+  Le signal radio est alors capté par un autre microcontrôleur qui déclenche l'alarme.
+  Un autre bouton permet d'éteindre temporairement le laser afin de pouvoir traverser la zone qu'il séparait.
+  Ce bouton n'est fonctionnel que lorsque des capteurs de rotation sont dans des positions précises.
+*/
 
 
 /* 
@@ -12,24 +18,29 @@
 */
 
 
-
 /* ======================================================================================== *\ 
 |  ======================================================================> 1. VARIABLES
 \* ======================================================================================== */ 
 
-RH_ASK driver;
+#include <Arduino.h>
+#include <RH_ASK.h>
+#include <SPI.h> // Nécessaire seulement pour compiler le code.
+RH_ASK driver;  // Communication radio  module RF 433Mhz.
 
-// const int LASER = 2;
+
 const int LED_GREEN = 2;  // Debug
 const int LED_BLUE = 10;  // Debug
+// const int LASER = 2;
 const int BUTTON_SWITCH = 5;
 const int BUTTON_ENABLE = 6;
 const int ROTATION_SENSOR = A0;
 const int LIGHT_SENSOR = A5;
 
+
 const int ACTIVATION_DELAY = 1000;
 const int LIGHT_THRESHOLD = 100;
-const char *msg = "Hello world!";
+const char *msg = "Hello world!"; // Message à envoyer via le module RF 433Mhz.
+
 
 bool buttonEnable = false;
 bool systemArmed = false;
@@ -55,14 +66,14 @@ void setup() {
   if (!driver.init())
       Serial.println("init failed");
 
-  pinMode(LED_BUILTIN, OUTPUT); // Degug only
+  pinMode(LED_BUILTIN, OUTPUT); // Debug
 
   pinMode(BUTTON_SWITCH, INPUT);
   pinMode(BUTTON_ENABLE, INPUT);
 
   // pinMode(LASER, OUTPUT);
-  pinMode(LED_GREEN, OUTPUT); // Degug only
-  pinMode(LED_BLUE, OUTPUT);  // Degug only
+  pinMode(LED_GREEN, OUTPUT); // Debug
+  pinMode(LED_BLUE, OUTPUT);  // Debug
 
   pinMode(LIGHT_SENSOR, INPUT);
 
@@ -81,15 +92,15 @@ void armSystem() {
   // digitalWrite(LASER, HIGH);
   digitalWrite(LED_GREEN, HIGH);
   systemArmed = true;
-  digitalWrite(LED_BUILTIN, HIGH);  // Degug only
+  digitalWrite(LED_BUILTIN, HIGH);  // Debug
 }
 
 
 void disarmSystem() {
   systemArmed = false;
   // digitalWrite(LASER, LOW);
-  digitalWrite(LED_GREEN, LOW);     // Degug only
-  digitalWrite(LED_BUILTIN, LOW);   // Degug only
+  digitalWrite(LED_GREEN, LOW);     // Debug
+  digitalWrite(LED_BUILTIN, LOW);   // Debug
 }
 
 
@@ -97,23 +108,6 @@ void pauseSystem() {
   // digitalWrite(LASER, LOW);
   counter = 0;
   digitalWrite(LED_GREEN, LOW);     // Debug
-}
-
-
-void checkButtons() {
-  // Lorsque le bouton interrupteur est appuyé, le système s'active.
-
-}
-
-
-void checkSystem() {
-  if (systemArmed)
-  {
-    if (buttonEnable)
-    {
-      // Désactive le système.
-    }
-  }
 }
 
 
@@ -161,10 +155,9 @@ void checkRotation() {
 void loop() {
 
   // ------------------------------------------------------------------------------------->
-
   /* 
-    - Si le système est éteint et que le bouton est appuyé, le système s'allume.
-    - Si le système est allumé et que le bouton et appuyez, le système s’éteint.
+    Si le système est éteint et que le bouton est appuyé, le système s'allume.
+    Si le système est allumé et que le bouton et appuyez, le système s’éteint.
   */
   
   if (digitalRead(BUTTON_SWITCH) == HIGH && systemArmed == false)
@@ -179,14 +172,13 @@ void loop() {
   }
 
   // ------------------------------------------------------------------------------------->
-  
   /* 
-    - Pendant que le système est armé, la variable "counter" incrémente de 1 à chaque boucle et les données du capteur de lumière sont lues.
-    - Pendant que le bouton est appuyé, le système se met en pause et la variable “counter” est continuellement remise à 0.
-    - Dès que le bouton est relâché, la variable “counter” recommence à s’incrémenter.
-    - Le système d'alarme de plus de déclencher que lorsque la variable “counter” est supérieure à “ACTIVATION_DELAY”.
-    - Cela permet de donner une certaine marge de manœuvre entre la réactivation du système lorsque le bouton n’est plus appuyé et le possible déclenchement de l’alarme.
-    - L'alarme se déclenche dès que le bouton est relâché sans cette précaution.
+    Pendant que le système est armé, la variable "counter" incrémente de 1 à chaque boucle et les données du capteur de lumière sont lues.
+    Pendant que le bouton est appuyé, le système se met en pause et la variable “counter” est continuellement remise à 0.
+    Dès que le bouton est relâché, la variable “counter” recommence à s’incrémenter.
+    Le système d'alarme de plus de déclencher que lorsque la variable “counter” est supérieure à “ACTIVATION_DELAY”.
+    Cela permet de donner une certaine marge de manœuvre entre la réactivation du système lorsque le bouton n’est plus appuyé et le possible déclenchement de l’alarme.
+    L'alarme se déclenche dès que le bouton est relâché sans cette précaution.
   */
 
   if (systemArmed)
@@ -196,7 +188,7 @@ void loop() {
     rotation = analogRead(ROTATION_SENSOR);
     light = analogRead(LIGHT_SENSOR);
 
-    digitalWrite(LED_GREEN, HIGH);  // Degug only
+    digitalWrite(LED_GREEN, HIGH);  // Debug
 
     checkRotation();
 
@@ -210,7 +202,7 @@ void loop() {
     // Déclenchement de l'alarme :
     if (light <= LIGHT_THRESHOLD && counter > ACTIVATION_DELAY)
     {
-      digitalWrite(LED_BLUE, HIGH);  // Degug only
+      digitalWrite(LED_BLUE, HIGH);  // Debug
       driver.send((uint8_t *)msg, strlen(msg));
       driver.waitPacketSent();
       delay(1000);
