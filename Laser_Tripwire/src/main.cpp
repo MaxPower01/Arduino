@@ -19,6 +19,7 @@
 
 RH_ASK driver;
 
+// Assignation des pattes :
 const int LASER = 2;
 const int BUTTON_SWITCH = 5;
 const int BUTTON_ENABLE = 6;
