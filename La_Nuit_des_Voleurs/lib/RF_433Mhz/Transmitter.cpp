@@ -4,17 +4,25 @@
 
 RH_ASK driver;
 
+const char *msg = "001100110011";
+
 void setup()
 {
     Serial.begin(9600);   // Debugging only
+
+    pinMode(LED_BUILTIN, OUTPUT);
+
     if (!driver.init())
          Serial.println("init failed");
 }
 
 void loop()
 {
-    const char *msg = "Hello World!";
+    digitalWrite(LED_BUILTIN, LOW);
+    delay(1000);
+    
     driver.send((uint8_t *)msg, strlen(msg));
     driver.waitPacketSent();
+    digitalWrite(LED_BUILTIN, HIGH);
     delay(1000);
 }

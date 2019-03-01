@@ -1,12 +1,8 @@
 #include <Arduino.h>
-#include <ArduinoJson.h>
-#include <VirtualWire.h>
 #include <RH_ASK.h>
 #include <SPI.h> // Not actualy used but needed to compile
 
 RH_ASK driver;
-
-char* messageReceived;
 
 void setup() {
     Serial.begin(9600); // Debugging only
@@ -28,11 +24,11 @@ void loop() {
         int i;
 
         // Message with a good checksum received, dump it.
-        messageReceived = (char*)buf;
-        Serial.println(messageReceived);
+        Serial.print("Message: ");
+        Serial.println((char*)buf);
 
         digitalWrite(LED_BUILTIN, HIGH);
-        delay(100);
+        delay(1000);
     }
     else
     {
