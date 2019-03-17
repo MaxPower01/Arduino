@@ -35,7 +35,6 @@ RH_ASK driver;  // Communication radio module RF 433Mhz.
 
 const byte BUTTON_SWITCH = 2;
 const byte BUTTON_ENABLE = 3;
-const byte LED_GREEN = 5;
 const byte LASER = 10;
 const byte ROTATION_SENSOR = A1;
 const byte LIGHT_SENSOR = A5;
@@ -56,7 +55,7 @@ int counter = 0;
 int light;
 int rotation;
 
-int ledGreenState = LOW;    // État de la LED (pour l'allumer et l'éteindre)
+int ledState = LOW;    // État de la LED (pour l'allumer et l'éteindre)
 
 
 
@@ -77,14 +76,11 @@ void setup() {
   if (!driver.init())
       Serial.println("init failed");
 
-  pinMode(LED_GREEN, OUTPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
   pinMode(BUTTON_SWITCH, INPUT);
   pinMode(BUTTON_ENABLE, INPUT);
-
   pinMode(LASER, OUTPUT);
-
   pinMode(LIGHT_SENSOR, INPUT);
-
   pinMode(ROTATION_SENSOR, INPUT);
 }
 
@@ -111,39 +107,6 @@ void disarmSystem() {
 void pauseSystem() {
     systemPaused = true;
     digitalWrite(LASER, LOW);
-}
-
-
-void checkRotation() {
-  if (
-    rotation >= 12 && rotation <= 20 ||
-    rotation >= 62 && rotation <= 70 ||
-    rotation >= 112 && rotation <= 120 ||
-    rotation >= 169 && rotation <= 175 ||
-    rotation >= 218 && rotation <= 226 ||
-    rotation >= 268 && rotation <= 280 ||
-    rotation >= 320 && rotation <= 330 ||
-    rotation >= 370 && rotation <= 378 ||
-    rotation >= 422 && rotation <= 430 ||
-    rotation >= 457 && rotation <= 484 ||
-    rotation >= 525 && rotation <= 535 ||
-    rotation >= 575 && rotation <= 585 ||
-    rotation >= 625 && rotation <= 635 ||
-    rotation >= 675 && rotation <= 685 ||
-    rotation >= 725 && rotation <= 735 ||
-    rotation >= 780 && rotation <= 790 ||
-    rotation >= 830 && rotation <= 840 ||
-    rotation >= 882 && rotation <= 892 ||
-    rotation >= 930 && rotation <= 940 ||
-    rotation >= 985 && rotation <= 995
-  )
-  {
-    rotationAccess = true;
-  }
-  else
-  {
-    rotationAccess = false;
-  }
 }
 
 
@@ -191,6 +154,6 @@ void loop() {
         }
     }
 
-    // La LED sera toujours allumée ou éteinte selon l'état de la variable "ledGreenState". Cela permet d'éviter l'utilisation de "delay()" :
-    digitalWrite(LED_GREEN, ledGreenState);
+    // La LED sera toujours allumée ou éteinte selon l'état de la variable "ledState". Cela permet d'éviter l'utilisation de "delay()" :
+    digitalWrite(LED_BUILTIN, ledState);
 }
