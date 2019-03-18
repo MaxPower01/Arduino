@@ -34,8 +34,8 @@
 RH_ASK driver;  // Communication radio module RF 433Mhz.
 
 const byte BUTTON_SWITCH = 2;
-const byte BUTTON_ENABLE = 3;
-const byte LED_GREEN = 5;
+const byte BUTTON_ENABLE = 12;
+// const byte LED_GREEN = 5;
 const byte LASER = 10;
 const byte ROTATION_SENSOR = A1;
 const byte LIGHT_SENSOR = A5;
@@ -47,6 +47,8 @@ const int THRESHOLD_LIGHT = 100;
 const int THRESHOLD_ROTATION = 500;
 
 const char *msg = "Hello world!";   // Message à envoyer via le module RF 433Mhz.
+
+unsigned long previousMillis = 0;
 
 bool systemArmed = false;
 bool systemPaused = false;
@@ -77,15 +79,13 @@ void setup() {
   if (!driver.init())
       Serial.println("init failed");
 
-  pinMode(LED_GREEN, OUTPUT);
-  pinMode(BUTTON_SWITCH, INPUT);
-  pinMode(BUTTON_ENABLE, INPUT);
-
-  pinMode(LASER, OUTPUT);
-
-  pinMode(LIGHT_SENSOR, INPUT);
-
-  pinMode(ROTATION_SENSOR, INPUT);
+    pinMode(LED_BUILTIN, OUTPUT);     // Pin 13
+    // pinMode(LED_GREEN, OUTPUT);
+    pinMode(BUTTON_SWITCH, INPUT);
+    pinMode(BUTTON_ENABLE, INPUT);
+    pinMode(LASER, OUTPUT);
+    pinMode(LIGHT_SENSOR, INPUT);
+    pinMode(ROTATION_SENSOR, INPUT);
 }
 
 
@@ -97,53 +97,29 @@ void setup() {
 \* ======================================================================================== */
 
 void armSystem() {       
-    digitalWrite(LASER, HIGH);
     systemArmed = true;
+    Serial.println("armSystem");
 }
 
 
 void disarmSystem() {
     systemArmed = false;
-    digitalWrite(LASER, LOW);
+    Serial.println("disarmSystem");
 }
 
 
 void pauseSystem() {
     systemPaused = true;
     digitalWrite(LASER, LOW);
+    digitalWrite(LED_BUILTIN, LOW);
 }
 
 
-void checkRotation() {
-  if (
-    rotation >= 12 && rotation <= 20 ||
-    rotation >= 62 && rotation <= 70 ||
-    rotation >= 112 && rotation <= 120 ||
-    rotation >= 169 && rotation <= 175 ||
-    rotation >= 218 && rotation <= 226 ||
-    rotation >= 268 && rotation <= 280 ||
-    rotation >= 320 && rotation <= 330 ||
-    rotation >= 370 && rotation <= 378 ||
-    rotation >= 422 && rotation <= 430 ||
-    rotation >= 457 && rotation <= 484 ||
-    rotation >= 525 && rotation <= 535 ||
-    rotation >= 575 && rotation <= 585 ||
-    rotation >= 625 && rotation <= 635 ||
-    rotation >= 675 && rotation <= 685 ||
-    rotation >= 725 && rotation <= 735 ||
-    rotation >= 780 && rotation <= 790 ||
-    rotation >= 830 && rotation <= 840 ||
-    rotation >= 882 && rotation <= 892 ||
-    rotation >= 930 && rotation <= 940 ||
-    rotation >= 985 && rotation <= 995
-  )
-  {
-    rotationAccess = true;
-  }
-  else
-  {
-    rotationAccess = false;
-  }
+void triggerAlarm() {
+    digitalWrite(LED_BUILTIN, HIGH); 
+    driver.send((uint8_t *)msg, strlen(msg));
+    driver.waitPacketSent();
+    delay(1000);
 }
 
 
@@ -158,39 +134,44 @@ void loop() {
     // "millis()" est une fonction qui calcule le nombre de millisecondes écoulées depuis que le microcontrôleur a commencer l'exécution du sketch :
     unsigned long currentMillis = millis();
 
+
     // Assignation des données du capteur de lumière :
     light = analogRead(LIGHT_SENSOR);
+
 
     // Démarrage du système :
     if (digitalRead(BUTTON_SWITCH) == HIGH && systemArmed == false)
     {
-        delay(1000);
         armSystem();
+        delay(1000);
     }
+    // Éteignage du système :
     else if (digitalRead(BUTTON_SWITCH) == HIGH && systemArmed == true)
     {
-        delay(1000);
         disarmSystem();
+        delay(1000);
     }
 
-    // Une fois que le système est armé...
-    if (systemArmed)
+
+    // Si le système est armé et que le bouton "pause" n'est pas appuyé :
+    if (systemArmed && digitalRead(BUTTON_ENABLE) == LOW)
     {
-        counter = counter + 1;
+        digitalWrite(LASER, HIGH);
+        digitalWrite(LED_BUILTIN, HIGH);
 
-        if (digitalRead(BUTTON_ENABLE) == HIGH)
+        /* if (light < THRESHOLD_LIGHT)
         {
-            pauseSystem();
-        }
-        else if (!systemPaused && light <= LIGHT_THRESHOLD)
-        {
-            digitalWrite(LED_GREEN, HIGH); 
-            driver.send((uint8_t *)msg, strlen(msg));
-            driver.waitPacketSent();
-            delay(1000);
-        }
+            triggerAlarm();
+        } */
     }
+
+    // Si le bouton "pause" est appuyé :
+    else if (systemArmed && digitalRead(BUTTON_ENABLE) == HIGH)
+    {
+        pauseSystem();
+    }
+    
 
     // La LED sera toujours allumée ou éteinte selon l'état de la variable "ledGreenState". Cela permet d'éviter l'utilisation de "delay()" :
-    digitalWrite(LED_GREEN, ledGreenState);
+    // digitalWrite(LED_GREEN, ledGreenState);
 }
