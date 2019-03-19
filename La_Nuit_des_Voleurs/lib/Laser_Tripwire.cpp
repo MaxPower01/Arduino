@@ -1,86 +1,76 @@
-/*
-  FIL DE DÉCLENCHEMENT AU LASER :
+// -------------------- FIL DE DÉCLENCHEMENT AU LASER -------------------- //
 
-  Le microcontrôleur gère un capteur de lumière et un laser qui pointe vers ce capteur.
-  Pour allumer ou éteindre le système (donc, le laser), il faut appuyer sur un bouton.
-
-  Lorsque le faisceau du laser est bloqué et que le capteur de lumière ne reçoit plus assez de lumière, un signal radio est émis grâce au module RF 433Mhz.
-  Le signal radio est alors capté par un autre microcontrôleur qui déclenche ensuite l'alarme.
-
-  Un autre bouton permet d'éteindre temporairement le laser afin de pouvoir traverser la zone qu'il séparait.
-  Ce bouton n'est fonctionnel que lorsque des capteurs de rotation sont dans des positions précises.
-*/
-
-
-/*
-  1. VARIABLES
-  2. SETUP
-  3. MÉTHODES
-  4. LOOP
-*/
-
-
-
-
-
-/* ======================================================================================== *\ 
-  |  ======================================================================> 1. VARIABLES
-  \* ======================================================================================== */
-
+// Librairies à inclure :
 #include <Arduino.h>
+#include <Timer.h>
 #include <RH_ASK.h>
-#include <SPI.h> // Nécessaire seulement pour compiler le code.
+#include <SPI.h>
 
-RH_ASK driver;  // Communication radio module RF 433Mhz.
+// Instances de classes :
+RH_ASK rh_driver;
+Timer t;
 
+// Pattes du Arduino :
 const byte SWITCH = 2;
 const byte LASER = 7;
 const byte LIGHT_SENSOR = A5;
 
-const int DELAY_LASER = 100;
-const long INTERVAL = 1000;
-
+// Capteur de lumière :
 const int THRESHOLD_LIGHT = 300;
 
-const char *msg = "Hello world!";   // Message à envoyer via le module RF 433Mhz.
+// Intensité de la lumière captée :
+int light;
 
+// Délais et intervals utilisés dans le sketch :
+const long DELAY_SYSTEM_ACTIVATION = 500;
+const long DELAY_TRIGGER_ALARM = 100;
+const long INTERVAL = 1000;
+
+// Temps depuis que le sketch a démarré :
+unsigned long timeSinceProgramStarted;
+
+// Délai pour allumer le système :
+unsigned long timeWhenOnSwitchTouched = 0;
+unsigned long timeSinceOnSwitchTouched = 0;
+bool onSwitchIsBeingTouched = false;
+
+// Délai pour éteindre le système :
+unsigned long timeWhenOffSwitchTouched = 0;
+unsigned long timeSinceOffSwitchTouched = 0;
+bool offSwitchIsBeingTouched = false;
+
+// État du système :
 bool systemArmed = false;
 bool systemPaused = false;
 
-unsigned long counter = 0;
-int light;
-int rotation;
+// Délai pour déclencher l'alarme :
+unsigned long timeWhenLightDropped = 0;
+unsigned long timeSinceLightDropped = 0;
+unsigned long lightHasDropped = false;
 
-unsigned long systemOnMillis = 0;
-unsigned long systemOffMillis = 0;
-unsigned long ledMillis = 0;
-int laserState = LOW;               // État de la LED (pour l'allumer et l'éteindre)
-int ledState = LOW;               // État de la LED (pour l'allumer et l'éteindre)
+// État de l'alarme :
+bool somethingTouchedTheLaser = false;
 
-
-
-
-/* ======================================================================================== *\ 
-  |  ======================================================================> 2. SETUP
-  \* ======================================================================================== */
+// Message à envoyer via le module RF 433Mhz :
+const char *msg = "Hello world!";
 
 
 
 
 
 void setup() {
-  // Initialisation de la communication via le port série à un débit de 9600 bits/seconde :
+  // Initialisation de la communication série :
   Serial.begin(9600);
 
   // Initialisation de la communication radio :
-  if (!driver.init())
+  if (!rh_driver.init())
+  {
     Serial.println("init failed");
+  }
 
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(SWITCH, INPUT);
-
   pinMode(LASER, OUTPUT);
-
   pinMode(LIGHT_SENSOR, INPUT);
 }
 
@@ -88,80 +78,153 @@ void setup() {
 
 
 
-/* ======================================================================================== *\ 
-  |  ======================================================================> 3. MÉTHODES
-  \* ======================================================================================== */
+void sendRadioSignal() {
+  // rh_driver.send((uint8_t *)msg, strlen(msg));
+  // rh_driver.waitPacketSent();
+}
+
+
+void armSystem() {
+  digitalWrite(LASER, HIGH);
+  systemArmed = true;
+}
+
+
+void disarmSystem() {
+  digitalWrite(LASER, LOW);
+  digitalWrite(LED_BUILTIN, LOW);
+  systemArmed = false;
+}
+
+
+void checkSystemSwitch() {
+  // ---------------------------------------- ON
+  // Pendant que le bouton est appuyé et que le système est éteint :
+  if (systemArmed == false && digitalRead(SWITCH) == HIGH)
+  {
+    // Si le bouton a déjà été appuyé :
+    if (!onSwitchIsBeingTouched)
+    {
+      // Prend en note le temps :
+      timeWhenOnSwitchTouched = timeSinceProgramStarted;
+
+      // Signal que le bouton a déjà été appuyé :
+      onSwitchIsBeingTouched = true;
+    }
+
+    // Sinon :
+    else
+    {
+      // Met à jour le temps écoulé depuis que le bouton a été appuyé la première fois :
+      timeSinceOnSwitchTouched = timeSinceProgramStarted - timeWhenOnSwitchTouched;
+
+      // Si le temps écoulé depuis est plus grand que le délai :
+      if (timeSinceOnSwitchTouched >= DELAY_SYSTEM_ACTIVATION)
+      {
+        // Active le système :
+        armSystem();
+
+        // Réinitialise l'état du bouton en spécifiant qu'il n'a maintenant plus été appuyé :
+        onSwitchIsBeingTouched = false;
+      }
+    }
+  }
+
+  // Dès que le bouton n'est plus appuyé, réinitialiser son état :
+  else
+  {
+    onSwitchIsBeingTouched = false;
+  }
+
+  // ---------------------------------------- OFF (fonctionnement identique à "ON")
+  if (systemArmed == true && digitalRead(SWITCH) == HIGH)
+  {
+    if (!offSwitchIsBeingTouched)
+    {
+      timeWhenOffSwitchTouched = timeSinceProgramStarted;
+      offSwitchIsBeingTouched = true;
+    }
+
+    else
+    {
+      timeSinceOffSwitchTouched = timeSinceProgramStarted - timeWhenOffSwitchTouched;
+
+      if (timeSinceOffSwitchTouched >= DELAY_SYSTEM_ACTIVATION)
+      {
+        disarmSystem();
+        offSwitchIsBeingTouched = false;
+      }
+    }
+  }
+
+  else
+  {
+    offSwitchIsBeingTouched = false;
+  }
+}
+
+
+void checkLightDetected() {
+  // Cette fonction est très similaire à "checkSystemSwitch" :
+  if (light <= THRESHOLD_LIGHT)
+    {
+      if (!lightHasDropped)
+      {
+        timeWhenLightDropped = timeSinceProgramStarted;
+        lightHasDropped = true;
+      }
+
+      else
+      {
+        timeSinceLightDropped = timeSinceProgramStarted - timeWhenLightDropped;
+
+        if (timeSinceLightDropped >= DELAY_TRIGGER_ALARM)
+        {
+          // Indique que l'alarme :
+          somethingTouchedTheLaser = true;
+          lightHasDropped = false;
+          digitalWrite(LED_BUILTIN, HIGH);
+        }
+      }
+    }
+
+    else
+    {
+      lightHasDropped = false;
+    }
+}
+
+
+void triggerAlarm() {
+  digitalWrite(LED_BUILTIN, HIGH);
+  sendRadioSignal();
+}
 
 
 
 
-
-/* ======================================================================================== *\ 
-  |  ======================================================================> 4. LOOP
-  \* ======================================================================================== */
 
 void loop() {
-  // "millis()" est une fonction qui calcule le nombre de millisecondes écoulées depuis que le microcontrôleur a commencer l'exécution du sketch :
-  // "unsigned" = Seulement des chiffres positifs :
-  unsigned long currentMillis = millis();
-  
+  // Lecture des données du capteur de lumière :
   light = analogRead(LIGHT_SENSOR);
-  // Serial.println(light);
 
+  // Mise à jour du temps écoulé depuis le début du sketch :
+  timeSinceProgramStarted = millis();
 
-  // Démarrage du système :
-  if (digitalRead(SWITCH) == HIGH && systemArmed == false)
-  {
-    systemOnMillis = systemOnMillis + 1;
-    Serial.println(systemOnMillis);
-    
-    if (systemOnMillis >= 250)
-    {
-      digitalWrite(LED_BUILTIN, HIGH);
-      systemArmed = true;
-      systemOnMillis = 0;
-      Serial.println('System on');
-    }
-  } else if (digitalRead(SWITCH) == HIGH && systemArmed == true)
-  {
-    systemOffMillis = systemOffMillis + 1;
-    Serial.println(systemOffMillis);
-    
-    if (systemOffMillis >= 250)
-    {
-      digitalWrite(LED_BUILTIN, LOW);
-      systemArmed = false;
-      systemOffMillis = 0;
-      Serial.println('System off');
-    }
-  }
+  // Allumage/éteignage du système :
+  checkSystemSwitch();
 
+  // Si le système est allumé :
   if (systemArmed)
   {
-    digitalWrite(LASER, HIGH);
-    
-    if (light <= THRESHOLD_LIGHT)
+    // Vérifie la lumière captée :
+    checkLightDetected();
+
+    // Et si quelque chose a touché le laser :
+    if (somethingTouchedTheLaser)
     {
-      Serial.println('ALARM');
-      // driver.send((uint8_t *)msg, strlen(msg));
-      // driver.waitPacketSent();
+      // Déclenche l'alarme :
+      triggerAlarm();
     }
-  } else
-  {
-    digitalWrite(LASER, LOW);
   }
-  
-
-  /* if (currentMillis - ledMillis >= INTERVAL)
-  {
-    previousMillis = ledMillis;
-
-    if (ledState == LOW) {
-      ledState = HIGH;
-    } else {
-      ledState = LOW;
-    }
-
-    digitalWrite(LED_BUILTIN, ledState);
-  } */
 }
