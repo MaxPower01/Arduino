@@ -23,9 +23,13 @@ const long SYSTEM_ACTIVATION_DELAY = 500;
 const long INTERVAL = 1000;
 
 unsigned long timeSinceProgramStarted;
+
 unsigned long timeWhenOnSwitchTouched = 0;
 unsigned long timeSinceOnSwitchTouched = 0;
 bool onSwitchIsBeingTouched = false;
+unsigned long timeWhenOffSwitchTouched = 0;
+unsigned long timeSinceOffSwitchTouched = 0;
+bool offSwitchIsBeingTouched = false;
 
 
 
@@ -54,7 +58,8 @@ void setup() {
 }
 
 void systemSwitch() {
-  // Pendant que le bouton est appuyé :
+  // ---------------------------------------- ON
+  // Pendant que le bouton est appuyé et que le système est éteint :
   if (systemArmed == false && digitalRead(SWITCH) == HIGH)
   {
     // Si le bouton a déjà été appuyé :
@@ -90,6 +95,46 @@ void systemSwitch() {
   {
     onSwitchIsBeingTouched = false;
   }
+
+
+
+  // ---------------------------------------- OFF
+  // Pendant que le bouton est appuyé et que le système est allumé :
+  if (systemArmed == true && digitalRead(SWITCH) == HIGH)
+  {
+    // Si le bouton a déjà été appuyé :
+    if (!offSwitchIsBeingTouched)
+    {
+      // Prend en note le temps :
+      timeWhenOffSwitchTouched = timeSinceProgramStarted;
+
+      // Signal que le bouton a déjà été appuyé :
+      offSwitchIsBeingTouched = true;
+    }
+
+    // Sinon :
+    else
+    {
+      // Met à jour le temps écoulé depuis que le bouton a été appuyé la première fois :
+      timeSinceOffSwitchTouched = timeSinceProgramStarted - timeWhenOffSwitchTouched;
+
+      // Si le temps écoulé depuis est plus grand que le délai :
+      if (timeSinceOffSwitchTouched >= SYSTEM_ACTIVATION_DELAY)
+      {
+        // Désactive le système :
+        systemArmed = false;
+
+        // Réinitialise l'état du bouton en spécifiant qu'il n'a maintenant plus été appuyé :
+        offSwitchIsBeingTouched = false;
+      }
+    }
+  }
+
+  // Dès que le bouton n'est plus appuyé, réinitialiser son état :
+  else
+  {
+    offSwitchIsBeingTouched = false;
+  }
 }
 
 
@@ -123,7 +168,6 @@ void loop() {
   if (systemArmed)
   {
     digitalWrite(LASER, HIGH);
-    digitalWrite(LED_BUILTIN, HIGH);
     
     // if (light <= THRESHOLD_LIGHT)
     // {
@@ -137,7 +181,6 @@ void loop() {
   else
   {
     digitalWrite(LASER, LOW);
-    digitalWrite(LED_BUILTIN, LOW);
   }
 
 
