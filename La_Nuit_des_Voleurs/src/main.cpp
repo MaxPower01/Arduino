@@ -50,6 +50,8 @@ unsigned long lightHasDropped = false;
 
 // État de l'alarme :
 bool somethingTouchedTheLaser = false;
+bool alarmTriggered = false;
+unsigned long timeWhenAlarmWasTriggered = 0;
 
 // Message à envoyer via le module RF 433Mhz :
 const char *msg = "Hello world!";
@@ -93,6 +95,9 @@ void armSystem() {
 void disarmSystem() {
   digitalWrite(LASER, LOW);
   digitalWrite(LED_BUILTIN, LOW);
+  
+  somethingTouchedTheLaser = false;
+  alarmTriggered = false;
   systemArmed = false;
 }
 
@@ -198,6 +203,11 @@ void checkLightDetected() {
 void triggerAlarm() {
   digitalWrite(LED_BUILTIN, HIGH);
   sendRadioSignal();
+  
+  alarmTriggered = true;
+
+  // Debug :
+  Serial.println(timeSinceProgramStarted);
 }
 
 
@@ -220,8 +230,8 @@ void loop() {
     // Vérifie la lumière captée :
     checkLightDetected();
 
-    // Et si quelque chose a touché le laser :
-    if (somethingTouchedTheLaser)
+    // Si quelque chose a touché le laser sans que l'alarme soit délà active :
+    if (somethingTouchedTheLaser && !alarmTriggered)
     {
       // Déclenche l'alarme :
       triggerAlarm();
