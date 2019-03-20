@@ -2,13 +2,11 @@
 
 // Librairies à inclure :
 #include <Arduino.h>
-#include <Timer.h>
 #include <RH_ASK.h>
 #include <SPI.h>
 
 // Instances de classes :
 RH_ASK rh_driver;
-Timer t;
 
 // Pattes du Arduino :
 const byte SWITCH = 2;
@@ -44,9 +42,9 @@ bool systemArmed = false;
 bool systemPaused = false;
 
 // Délai pour déclencher l'alarme :
-unsigned long timeWhenLightDropped = 0;
-unsigned long timeSinceLightDropped = 0;
-unsigned long lightHasDropped = false;
+unsigned long timeWhenLightInputDropped = 0;
+unsigned long timeSinceLightInputDropped = 0;
+unsigned long lightInputDropped = false;
 
 // État de l'alarme :
 bool somethingTouchedTheLaser = false;
@@ -54,7 +52,7 @@ bool alarmTriggered = false;
 unsigned long timeWhenAlarmWasTriggered = 0;
 
 // Message à envoyer via le module RF 433Mhz :
-const char *msg = "Hello world!";
+const char *MESSAGE = "Hello world!";
 
 
 
@@ -81,7 +79,7 @@ void setup() {
 
 
 void sendRadioSignal() {
-  // rh_driver.send((uint8_t *)msg, strlen(msg));
+  // rh_driver.send((uint8_t *)MESSAGE, strlen(MESSAGE));
   // rh_driver.waitPacketSent();
 }
 
@@ -169,25 +167,24 @@ void checkSystemSwitch() {
 }
 
 
-void checkLightDetected() {
-  // Cette fonction est très similaire à "checkSystemSwitch" :
+void checkLightInput() {
+  // Fonction presque identique à "checkSystemSwitch" :
   if (light <= THRESHOLD_LIGHT)
     {
-      if (!lightHasDropped)
+      if (!lightInputDropped)
       {
-        timeWhenLightDropped = timeSinceProgramStarted;
-        lightHasDropped = true;
+        timeWhenLightInputDropped = timeSinceProgramStarted;
+        lightInputDropped = true;
       }
 
       else
       {
-        timeSinceLightDropped = timeSinceProgramStarted - timeWhenLightDropped;
+        timeSinceLightInputDropped = timeSinceProgramStarted - timeWhenLightInputDropped;
 
-        if (timeSinceLightDropped >= DELAY_TRIGGER_ALARM)
+        if (timeSinceLightInputDropped >= DELAY_TRIGGER_ALARM)
         {
-          // Indique que l'alarme :
           somethingTouchedTheLaser = true;
-          lightHasDropped = false;
+          lightInputDropped = false;
           digitalWrite(LED_BUILTIN, HIGH);
         }
       }
@@ -195,7 +192,7 @@ void checkLightDetected() {
 
     else
     {
-      lightHasDropped = false;
+      lightInputDropped = false;
     }
 }
 
@@ -207,7 +204,7 @@ void triggerAlarm() {
   alarmTriggered = true;
 
   // Debug :
-  Serial.println(timeSinceProgramStarted);
+  // Serial.println(timeSinceProgramStarted);
 }
 
 
@@ -227,8 +224,8 @@ void loop() {
   // Si le système est allumé :
   if (systemArmed)
   {
-    // Vérifie la lumière captée :
-    checkLightDetected();
+    // Vérifie l'intensité de la lumière captée :
+    checkLightInput();
 
     // Si quelque chose a touché le laser sans que l'alarme soit délà active :
     if (somethingTouchedTheLaser && !alarmTriggered)

@@ -1,213 +1,120 @@
-// -------------------- FIL DE DÉCLENCHEMENT AU LASER -------------------- //
+// SYSTÈME DE DÉTECTION DU SON :
 
-// Librairies à inclure :
 #include <Arduino.h>
-#include <Timer.h>
 #include <RH_ASK.h>
 #include <SPI.h>
 
-// Instances de classes :
+#define COMMON_ANODE
+
 RH_ASK rh_driver;
-Timer t;
 
-// Pattes du Arduino :
+const int SOUND_SENSOR_1 = A0;
+const int SOUND_SENSOR_2 = A1;
+const int SOUND_SENSOR_3 = A4;
+const int SOUND_SENSOR_4 = A5;
+
 const byte SWITCH = 2;
-const byte LASER = 7;
-const byte LIGHT_SENSOR = A5;
 
-// Capteur de lumière :
-const int THRESHOLD_LIGHT = 300;
-
-// Intensité de la lumière captée :
-int light;
-
-// Délais et intervals utilisés dans le sketch :
-const long DELAY_SYSTEM_ACTIVATION = 500;
-const long DELAY_TRIGGER_ALARM = 100;
-const long INTERVAL = 1000;
-
-// Temps depuis que le sketch a démarré :
-unsigned long timeSinceProgramStarted;
-
-// Délai pour allumer le système :
-unsigned long timeWhenOnSwitchTouched = 0;
-unsigned long timeSinceOnSwitchTouched = 0;
-bool onSwitchIsBeingTouched = false;
-
-// Délai pour éteindre le système :
-unsigned long timeWhenOffSwitchTouched = 0;
-unsigned long timeSinceOffSwitchTouched = 0;
-bool offSwitchIsBeingTouched = false;
-
-// État du système :
-bool systemArmed = false;
-bool systemPaused = false;
-
-// Délai pour déclencher l'alarme :
-unsigned long timeWhenLightDropped = 0;
-unsigned long timeSinceLightDropped = 0;
-unsigned long lightHasDropped = false;
-
-// État de l'alarme :
-bool somethingTouchedTheLaser = false;
-bool alarmTriggered = false;
-unsigned long timeWhenAlarmWasTriggered = 0;
+const int LED_GREEN = 10;
+const int LED_YELLOW = 9;
+const int LED_RED = 8;
 
 // Message à envoyer via le module RF 433Mhz :
-const char *msg = "Hello world!";
+const char *MESSAGE = "Hello world!";
+
+const int DELAY_ACTIVATION = 1000;
+const int DELAY_DETECTION = 1000;
+
+const int SOUND_INPUTS = 4;
+const byte SOUND_INPUT_PINS[SOUND_INPUTS] = {SOUND_SENSOR_1, SOUND_SENSOR_2, SOUND_SENSOR_3, SOUND_SENSOR_4};
+
+const int THRESHOLD_SOUND = 2;
+const int NUMBER_OF_SOUND_READINGS = 20;
+
+int soundInputReadings[SOUND_INPUTS][NUMBER_OF_SOUND_READINGS];
+int soundReadingIndex[SOUND_INPUTS] = {0, 0};
+int soundInputsTotal[SOUND_INPUTS] = {0, 0};
+int soundInputsAverage[SOUND_INPUTS] = {0, 0};
+
+bool systemArmed = false;
 
 
 
 
 
 void setup() {
-  // Initialisation de la communication série :
+  // Initialisation de la communication à un débit de 9600 bits/seconde :
   Serial.begin(9600);
 
-  // Initialisation de la communication radio :
   if (!rh_driver.init())
   {
     Serial.println("init failed");
   }
 
-  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(SOUND_SENSOR_1, INPUT);
+  pinMode(SOUND_SENSOR_2, INPUT);
+  pinMode(SOUND_SENSOR_3, INPUT);
+  pinMode(SOUND_SENSOR_4, INPUT);
+
   pinMode(SWITCH, INPUT);
-  pinMode(LASER, OUTPUT);
-  pinMode(LIGHT_SENSOR, INPUT);
+
+  // Initialisation de toutes les lectures d'échantillons à 0 :
+  resetReadings();
+
 }
 
 
-
-
-
-void sendRadioSignal() {
-  // rh_driver.send((uint8_t *)msg, strlen(msg));
-  // rh_driver.waitPacketSent();
+void resetReadings() {
+  for (int i = 0; i < SOUND_INPUTS; i++) {
+    for (int thisReading = 0; thisReading < NUMBER_OF_SOUND_READINGS; thisReading++) {
+      soundInputReadings[i][thisReading] = 0;
+    }
+  }
 }
 
 
 void armSystem() {
-  digitalWrite(LASER, HIGH);
   systemArmed = true;
 }
 
 
 void disarmSystem() {
-  digitalWrite(LASER, LOW);
-  digitalWrite(LED_BUILTIN, LOW);
-  
-  somethingTouchedTheLaser = false;
-  alarmTriggered = false;
   systemArmed = false;
 }
 
 
-void checkSystemSwitch() {
-  // ---------------------------------------- ON
-  // Pendant que le bouton est appuyé et que le système est éteint :
-  if (systemArmed == false && digitalRead(SWITCH) == HIGH)
-  {
-    // Si le bouton a déjà été appuyé :
-    if (!onSwitchIsBeingTouched)
-    {
-      // Prend en note le temps :
-      timeWhenOnSwitchTouched = timeSinceProgramStarted;
+void smoothing() {
+  // Pour chaque capteur de son :
+  for (int i = 0; i < SOUND_INPUTS; i++) {
+    // Soustrait la dernière lecture du total :
+    soundInputsTotal[i] = soundInputsTotal[i] - soundInputReadings[i][soundReadingIndex[i]];
 
-      // Signal que le bouton a déjà été appuyé :
-      onSwitchIsBeingTouched = true;
+    // Lis la donnée provenant du capteur :
+    soundInputReadings[i][soundReadingIndex[i]] = analogRead(SOUND_INPUT_PINS[i]);
+
+    // Ajoute cet échantillon au total :
+    soundInputsTotal[i] = soundInputsTotal[i] + soundInputReadings[i][soundReadingIndex[i]];
+
+    // Passe à la position suivante dans la liste d'échantillons :
+    soundReadingIndex[i] = soundReadingIndex[i] + 1;
+    
+    // Une fois arrivé à la fin de la liste, recommence :
+    if (soundReadingIndex[i] >= NUMBER_OF_SOUND_READINGS) {
+      soundReadingIndex[i] = 0;
     }
 
-    // Sinon :
-    else
-    {
-      // Met à jour le temps écoulé depuis que le bouton a été appuyé la première fois :
-      timeSinceOnSwitchTouched = timeSinceProgramStarted - timeWhenOnSwitchTouched;
-
-      // Si le temps écoulé depuis est plus grand que le délai :
-      if (timeSinceOnSwitchTouched >= DELAY_SYSTEM_ACTIVATION)
-      {
-        // Active le système :
-        armSystem();
-
-        // Réinitialise l'état du bouton en spécifiant qu'il n'a maintenant plus été appuyé :
-        onSwitchIsBeingTouched = false;
-      }
-    }
-  }
-
-  // Dès que le bouton n'est plus appuyé, réinitialiser son état :
-  else
-  {
-    onSwitchIsBeingTouched = false;
-  }
-
-  // ---------------------------------------- OFF (fonctionnement identique à "ON")
-  if (systemArmed == true && digitalRead(SWITCH) == HIGH)
-  {
-    if (!offSwitchIsBeingTouched)
-    {
-      timeWhenOffSwitchTouched = timeSinceProgramStarted;
-      offSwitchIsBeingTouched = true;
-    }
-
-    else
-    {
-      timeSinceOffSwitchTouched = timeSinceProgramStarted - timeWhenOffSwitchTouched;
-
-      if (timeSinceOffSwitchTouched >= DELAY_SYSTEM_ACTIVATION)
-      {
-        disarmSystem();
-        offSwitchIsBeingTouched = false;
-      }
-    }
-  }
-
-  else
-  {
-    offSwitchIsBeingTouched = false;
+    // Calcul la moyenne des échantillons de ce capteur :
+    soundInputsAverage[i] = soundInputsTotal[i] / NUMBER_OF_SOUND_READINGS;
   }
 }
 
 
-void checkLightDetected() {
-  // Cette fonction est très similaire à "checkSystemSwitch" :
-  if (light <= THRESHOLD_LIGHT)
-    {
-      if (!lightHasDropped)
-      {
-        timeWhenLightDropped = timeSinceProgramStarted;
-        lightHasDropped = true;
-      }
-
-      else
-      {
-        timeSinceLightDropped = timeSinceProgramStarted - timeWhenLightDropped;
-
-        if (timeSinceLightDropped >= DELAY_TRIGGER_ALARM)
-        {
-          // Indique que l'alarme :
-          somethingTouchedTheLaser = true;
-          lightHasDropped = false;
-          digitalWrite(LED_BUILTIN, HIGH);
-        }
-      }
+void watchSamples() {
+  for (int i = 0; i < SOUND_INPUTS; i++) {
+    if (soundInputsAverage[i] >= THRESHOLD_SOUND && systemArmed) {
+      // Alarm     
     }
-
-    else
-    {
-      lightHasDropped = false;
-    }
-}
-
-
-void triggerAlarm() {
-  digitalWrite(LED_BUILTIN, HIGH);
-  sendRadioSignal();
-  
-  alarmTriggered = true;
-
-  // Debug :
-  Serial.println(timeSinceProgramStarted);
+  }
 }
 
 
@@ -215,26 +122,40 @@ void triggerAlarm() {
 
 
 void loop() {
-  // Lecture des données du capteur de lumière :
-  light = analogRead(LIGHT_SENSOR);
 
-  // Mise à jour du temps écoulé depuis le début du sketch :
-  timeSinceProgramStarted = millis();
+  counter = counter + 1;
 
-  // Allumage/éteignage du système :
-  checkSystemSwitch();
-
-  // Si le système est allumé :
-  if (systemArmed)
+  // ------------------------------------------------------------------------------------->
+  
+  /* 
+    Si le système est éteint et que le bouton est appuyé, le système s'allume.
+    Si le système est allumé et que le bouton et appuyez, le système s’éteint.
+  */
+  
+  if (digitalRead(SWITCH) == HIGH && systemArmed == false)
   {
-    // Vérifie la lumière captée :
-    checkLightDetected();
+    delay(DELAY_ACTIVATION);
+    armSystem();
+  }
+  else if (digitalRead(SWITCH) == HIGH && systemArmed == true)
+  {
+    disarmSystem();
+    delay(DELAY_ACTIVATION);
+  }
 
-    // Si quelque chose a touché le laser sans que l'alarme soit délà active :
-    if (somethingTouchedTheLaser && !alarmTriggered)
+  // -------------------------------------------------------------------------------------> 
+  
+  if (systemArmed) {
+    for(int i = 0; i < SOUND_INPUTS; i++)
     {
-      // Déclenche l'alarme :
-      triggerAlarm();
+      if(analogRead(SOUND_INPUT_PINS[i]) > THRESHOLD_SOUND)
+      {
+        warn();
+        delay(DELAY_DETECTION);
+        warningLevel = warningLevel + 1;   
+      }
     }
   }
+
+  delay(10);
 }

@@ -1,77 +1,73 @@
-/* 
-  DÉTECTION DU SON :
-
-  ...
-*/
-
-
-/* 
-  1. VARIABLES
-  2. SETUP
-  3. MÉTHODES
-  4. LOOP
-*/
-
-
-
-
-
-/* ======================================================================================== *\ 
-|  ======================================================================> 1. VARIABLES
-\* ======================================================================================== */ 
+// SYSTÈME DE DÉTECTION DU SON :
 
 #include <Arduino.h>
 #include <RH_ASK.h>
-#include <SPI.h> // Not actually used but needed to compile
+#include <SPI.h>
 
 #define COMMON_ANODE
 
-RH_ASK driver;
+RH_ASK rh_driver;
 
 const int SOUND_SENSOR_1 = A0;
-const int SOUND_SENSOR_2 = A2;
-const int SOUND_SENSOR_3 = A3;
+const int SOUND_SENSOR_2 = A1;
+const int SOUND_SENSOR_3 = A4;
 const int SOUND_SENSOR_4 = A5;
 
-const int BUTTON_SWITCH = 4;
+const byte SWITCH = 2;
 
 const int LED_GREEN = 10;
 const int LED_YELLOW = 9;
 const int LED_RED = 8;
 
-const char *msg = "Hello world!"; // Message à envoyer via le module RF 433Mhz.
+// Message à envoyer via le module RF 433Mhz :
+const char *MESSAGE = "Hello world!";
 
-const int ACTIVATION_DELAY = 1000;
-const int DETECTION_DELAY = 1000;
+const int DELAY_ACTIVATION = 1000;
+const int DELAY_DETECTION = 1000;
 
-const int INPUTS = 5;
-const byte inputPins[INPUTS] = {SOUND_SENSOR_1, SOUND_SENSOR_2, SOUND_SENSOR_3, SOUND_SENSOR_4};
+const int SOUND_INPUTS = 4;
+const byte SOUND_INPUT_PINS[SOUND_INPUTS] = {SOUND_SENSOR_1, SOUND_SENSOR_2, SOUND_SENSOR_3, SOUND_SENSOR_4};
 
-const int THRESHOLD = 2;
-const int SMOOTHNESS = 20;          // Nombre d'échantillon à prendre en compte.
+const int THRESHOLD_SOUND = 2;
+const int NUMBER_OF_SOUND_READINGS = 20;
 
-int readings[INPUTS][SMOOTHNESS];   // Lectures provenant des capteurs d'une taille de "SMOOTHNESS".
-int readIndex[INPUTS] = {0, 0};     // Index de la lecture en cours.
-int total[INPUTS] = {0, 0};         // Somme des échantillons.
-int average[INPUTS] = {0, 0};       // Moyenne des échantillons.
+int soundInputReadings[SOUND_INPUTS][NUMBER_OF_SOUND_READINGS];
+int soundReadingIndex[SOUND_INPUTS] = {0, 0};
+int soundInputsTotal[SOUND_INPUTS] = {0, 0};
+int soundInputsAverage[SOUND_INPUTS] = {0, 0};
 
 bool systemArmed = false;
 
-int counter = 0;
-int warningLevel = 0;
 
 
 
 
+void setup() {
+  // Initialisation de la communication à un débit de 9600 bits/seconde :
+  Serial.begin(9600);
 
-/* ======================================================================================== *\ 
-|  ======================================================================> 2. MÉTHODES
-\* ======================================================================================== */
+  if (!rh_driver.init())
+  {
+    Serial.println("init failed");
+  }
+
+  pinMode(SOUND_SENSOR_1, INPUT);
+  pinMode(SOUND_SENSOR_2, INPUT);
+  pinMode(SOUND_SENSOR_3, INPUT);
+  pinMode(SOUND_SENSOR_4, INPUT);
+
+  pinMode(SWITCH, INPUT);
+
+  // Initialisation de toutes les lectures d'échantillons à 0 :
+  resetReadings();
+
+}
+
 
 void resetReadings() {
-  for (int i = 0; i < INPUTS; i++) {
-    for (int thisReading = 0; thisReading < SMOOTHNESS; thisReading++) {
-      readings[i][thisReading] = 0;
+  for (int i = 0; i < SOUND_INPUTS; i++) {
+    for (int thisReading = 0; thisReading < NUMBER_OF_SOUND_READINGS; thisReading++) {
+      soundInputReadings[i][thisReading] = 0;
     }
   }
 }
@@ -88,107 +84,42 @@ void disarmSystem() {
 
 
 void smoothing() {
-  for (int i = 0; i < INPUTS; i++) {
-    // Soustraction de la dernière lecture :
-    total[i] = total[i] - readings[i][readIndex[i]];
-    // Lecture d'un échantillon provenant du capteur :
-    readings[i][readIndex[i]] = analogRead(inputPins[i]);
-    // Ajout de cet échantillon au total :
-    total[i] = total[i] + readings[i][readIndex[i]];
-    // On passe à la position suivante :
-    readIndex[i] = readIndex[i] + 1;
-    // Si on est à la fin du tableau, on recommence :
-    if (readIndex[i] >= SMOOTHNESS) {
-      readIndex[i] = 0;
+  // Pour chaque capteur de son :
+  for (int i = 0; i < SOUND_INPUTS; i++) {
+    // Soustrait la dernière lecture du total :
+    soundInputsTotal[i] = soundInputsTotal[i] - soundInputReadings[i][soundReadingIndex[i]];
+
+    // Lis la donnée provenant du capteur :
+    soundInputReadings[i][soundReadingIndex[i]] = analogRead(SOUND_INPUT_PINS[i]);
+
+    // Ajoute cet échantillon au total :
+    soundInputsTotal[i] = soundInputsTotal[i] + soundInputReadings[i][soundReadingIndex[i]];
+
+    // Passe à la position suivante dans la liste d'échantillons :
+    soundReadingIndex[i] = soundReadingIndex[i] + 1;
+    
+    // Une fois arrivé à la fin de la liste, recommence :
+    if (soundReadingIndex[i] >= NUMBER_OF_SOUND_READINGS) {
+      soundReadingIndex[i] = 0;
     }
-    // Calcul de la moyenne des échantillons pour le capteur "i" :
-    average[i] = total[i] / SMOOTHNESS;
+
+    // Calcul la moyenne des échantillons de ce capteur :
+    soundInputsAverage[i] = soundInputsTotal[i] / NUMBER_OF_SOUND_READINGS;
   }
 }
 
 
 void watchSamples() {
-  for (int i = 0; i < INPUTS; i++) {
-    if (average[i] >= THRESHOLD && systemArmed) {
-      warningLevel = warningLevel + 1;      
+  for (int i = 0; i < SOUND_INPUTS; i++) {
+    if (soundInputsAverage[i] >= THRESHOLD_SOUND && systemArmed) {
+      // Alarm     
     }
   }
 }
 
 
-void warn() {
-  switch (warningLevel)
-  {
-    case 0:
-      digitalWrite(LED_GREEN, HIGH);
-      counter = 0;
-      break;
-
-    case 1:
-      digitalWrite(LED_GREEN, LOW);
-      digitalWrite(LED_YELLOW, HIGH);
-      counter = 0;
-      break;
-
-    case 2:
-      digitalWrite(LED_YELLOW, LOW);
-      digitalWrite(LED_RED, HIGH);
-      counter = 0;
-      break;        
-
-    case 3:
-      digitalWrite(LED_RED, LOW);
-      // Envoi du signal radio :
-      driver.send((uint8_t *)msg, strlen(msg));
-      driver.waitPacketSent();
-      delay(1000); 
-      break;
-  
-    default:
-      break;
-  }
-}
 
 
-
-
-
-/* ======================================================================================== *\ 
-|  ======================================================================> 3. SETUP
-\* ======================================================================================== */ 
-
-void setup() {
-  // Initialisation de la communication à un débit de 9600 bits/seconde :
-  Serial.begin(9600);
-
-  // Définition du mode de chacune des pattes utilisées :
-  pinMode(SOUND_SENSOR_1, INPUT);
-  pinMode(SOUND_SENSOR_2, INPUT);
-  pinMode(SOUND_SENSOR_3, INPUT);
-  pinMode(SOUND_SENSOR_4, INPUT);
-  
-  pinMode(LED_GREEN, OUTPUT);
-  pinMode(LED_YELLOW, OUTPUT);
-  pinMode(LED_RED, OUTPUT);
-
-  pinMode(BUTTON_SWITCH, INPUT);
-
-  // Initialisation de toutes les lectures d'échantillons à 0 :
-  resetReadings();
-
-  if (!driver.init())
-  {
-    Serial.println("init failed");
-  }
-}
-
-
-
-
-
-/* ======================================================================================== *\ 
-|  ======================================================================> 4. LOOP
-\* ======================================================================================== */ 
 
 void loop() {
 
@@ -201,26 +132,26 @@ void loop() {
     Si le système est allumé et que le bouton et appuyez, le système s’éteint.
   */
   
-  if (digitalRead(BUTTON_SWITCH) == HIGH && systemArmed == false)
+  if (digitalRead(SWITCH) == HIGH && systemArmed == false)
   {
-    delay(ACTIVATION_DELAY);
+    delay(DELAY_ACTIVATION);
     armSystem();
   }
-  else if (digitalRead(BUTTON_SWITCH) == HIGH && systemArmed == true)
+  else if (digitalRead(SWITCH) == HIGH && systemArmed == true)
   {
     disarmSystem();
-    delay(ACTIVATION_DELAY);
+    delay(DELAY_ACTIVATION);
   }
 
   // -------------------------------------------------------------------------------------> 
   
   if (systemArmed) {
-    for(int i = 0; i < INPUTS; i++)
+    for(int i = 0; i < SOUND_INPUTS; i++)
     {
-      if(analogRead(inputPins[i]) > THRESHOLD)
+      if(analogRead(SOUND_INPUT_PINS[i]) > THRESHOLD_SOUND)
       {
         warn();
-        delay(DETECTION_DELAY);
+        delay(DELAY_DETECTION);
         warningLevel = warningLevel + 1;   
       }
     }
