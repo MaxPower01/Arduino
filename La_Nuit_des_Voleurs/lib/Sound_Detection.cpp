@@ -8,35 +8,56 @@
 
 RH_ASK rh_driver;
 
-const int SOUND_SENSOR_1 = A0;
-const int SOUND_SENSOR_2 = A1;
-const int SOUND_SENSOR_3 = A4;
-const int SOUND_SENSOR_4 = A5;
-
+// Pattes du Arduino :
+const byte SOUND_SENSOR_1 = A0;
+const byte SOUND_SENSOR_2 = A1;
+const byte SOUND_SENSOR_3 = A4;
+const byte SOUND_SENSOR_4 = A5;
 const byte SWITCH = 2;
-
-const int LED_GREEN = 10;
-const int LED_YELLOW = 9;
-const int LED_RED = 8;
 
 // Message à envoyer via le module RF 433Mhz :
 const char *MESSAGE = "Hello world!";
 
-const int DELAY_ACTIVATION = 1000;
-const int DELAY_DETECTION = 1000;
+// Délais et intervals utilisés dans le sketch :
+const long DELAY_SYSTEM_ACTIVATION = 500;
+const long DELAY_DETECTION = 1000;
 
+// Capteurs de son :
 const int SOUND_INPUTS = 4;
 const byte SOUND_INPUT_PINS[SOUND_INPUTS] = {SOUND_SENSOR_1, SOUND_SENSOR_2, SOUND_SENSOR_3, SOUND_SENSOR_4};
 
-const int THRESHOLD_SOUND = 2;
-const int NUMBER_OF_SOUND_READINGS = 20;
+// Seul de sensibilité de l'alarme :
+const int THRESHOLD_SOUND = 10;
 
+// Nombre de lectures des capteurs de son à prendre en compte pour établir une moyenne  :
+const int NUMBER_OF_SOUND_READINGS = 10;
+
+// Établissement d'une moyenne de lectures d'intensité du son :
 int soundInputReadings[SOUND_INPUTS][NUMBER_OF_SOUND_READINGS];
 int soundReadingIndex[SOUND_INPUTS] = {0, 0};
 int soundInputsTotal[SOUND_INPUTS] = {0, 0};
 int soundInputsAverage[SOUND_INPUTS] = {0, 0};
 
+// État du système :
 bool systemArmed = false;
+bool systemPaused = false;
+
+// Délai pour allumer le système :
+unsigned long timeWhenOnSwitchTouched = 0;
+unsigned long timeSinceOnSwitchTouched = 0;
+bool onSwitchIsBeingTouched = false;
+
+// Délai pour éteindre le système :
+unsigned long timeWhenOffSwitchTouched = 0;
+unsigned long timeSinceOffSwitchTouched = 0;
+bool offSwitchIsBeingTouched = false;
+
+// État de l'alarme :
+bool alarmTriggered = false;
+bool soundIsLouderThenThreshold = false;
+
+// Temps depuis que le sketch a démarré :
+unsigned long timeSinceProgramStarted;
 
 
 
@@ -46,6 +67,7 @@ void setup() {
   // Initialisation de la communication à un débit de 9600 bits/seconde :
   Serial.begin(9600);
 
+  // Initialisation de la communication radio :
   if (!rh_driver.init())
   {
     Serial.println("init failed");
@@ -55,20 +77,83 @@ void setup() {
   pinMode(SOUND_SENSOR_2, INPUT);
   pinMode(SOUND_SENSOR_3, INPUT);
   pinMode(SOUND_SENSOR_4, INPUT);
-
   pinMode(SWITCH, INPUT);
 
-  // Initialisation de toutes les lectures d'échantillons à 0 :
-  resetReadings();
-
-}
-
-
-void resetReadings() {
+  // Initialisation de toutes les lectures d'échantillons de son à 0 :
   for (int i = 0; i < SOUND_INPUTS; i++) {
     for (int thisReading = 0; thisReading < NUMBER_OF_SOUND_READINGS; thisReading++) {
       soundInputReadings[i][thisReading] = 0;
     }
+  }
+}
+
+
+
+
+
+void checkSystemSwitch() {
+  // ---------------------------------------- ON
+  // Pendant que le bouton est appuyé et que le système est éteint :
+  if (systemArmed == false && digitalRead(SWITCH) == HIGH)
+  {
+    // Si le bouton a déjà été appuyé :
+    if (!onSwitchIsBeingTouched)
+    {
+      // Prend en note le temps :
+      timeWhenOnSwitchTouched = timeSinceProgramStarted;
+
+      // Signal que le bouton a déjà été appuyé :
+      onSwitchIsBeingTouched = true;
+    }
+
+    // Sinon :
+    else
+    {
+      // Met à jour le temps écoulé depuis que le bouton a été appuyé la première fois :
+      timeSinceOnSwitchTouched = timeSinceProgramStarted - timeWhenOnSwitchTouched;
+
+      // Si le temps écoulé depuis est plus grand que le délai :
+      if (timeSinceOnSwitchTouched >= DELAY_SYSTEM_ACTIVATION)
+      {
+        // Active le système :
+        armSystem();
+
+        // Réinitialise l'état du bouton en spécifiant qu'il n'a maintenant plus été appuyé :
+        onSwitchIsBeingTouched = false;
+      }
+    }
+  }
+
+  // Dès que le bouton n'est plus appuyé, réinitialiser son état :
+  else
+  {
+    onSwitchIsBeingTouched = false;
+  }
+
+  // ---------------------------------------- OFF (fonctionnement identique à "ON")
+  if (systemArmed == true && digitalRead(SWITCH) == HIGH)
+  {
+    if (!offSwitchIsBeingTouched)
+    {
+      timeWhenOffSwitchTouched = timeSinceProgramStarted;
+      offSwitchIsBeingTouched = true;
+    }
+
+    else
+    {
+      timeSinceOffSwitchTouched = timeSinceProgramStarted - timeWhenOffSwitchTouched;
+
+      if (timeSinceOffSwitchTouched >= DELAY_SYSTEM_ACTIVATION)
+      {
+        disarmSystem();
+        offSwitchIsBeingTouched = false;
+      }
+    }
+  }
+  
+  else
+  {
+    offSwitchIsBeingTouched = false;
   }
 }
 
@@ -79,11 +164,14 @@ void armSystem() {
 
 
 void disarmSystem() {
+  digitalWrite(LED_BUILTIN, LOW);
   systemArmed = false;
+  alarmTriggered = false;
+  soundIsLouderThenThreshold = false;
 }
 
 
-void smoothing() {
+void smoothInputs() {
   // Pour chaque capteur de son :
   for (int i = 0; i < SOUND_INPUTS; i++) {
     // Soustrait la dernière lecture du total :
@@ -118,44 +206,54 @@ void watchSamples() {
 }
 
 
+void checkSoundInputs() {
+    // Pour chaque capteur de son :
+    for(int i = 0; i < SOUND_INPUTS; i++)
+    {
+      // Si la moyenne des lectures est supérieure au seuil de sensibilité de l'alarme :
+      if(analogRead(SOUND_INPUT_PINS[i]) > THRESHOLD_SOUND)
+      {
+        soundIsLouderThenThreshold = true;
+      }
+    }
+}
+
+
+void triggerAlarm() {
+  digitalWrite(LED_BUILTIN, HIGH);
+}
+
+
+void sendRadioMessage() {
+  rh_driver.send((uint8_t *)MESSAGE, strlen(MESSAGE));
+  rh_driver.waitPacketSent();
+}
+
+
 
 
 
 void loop() {
+  // Mise à jour du temps écoulé depuis le début du sketch :
+  timeSinceProgramStarted = millis();
 
-  counter = counter + 1;
+  // Lecture des données et établissement d'une moyenne par capteur de son : 
+  smoothInputs();
 
-  // ------------------------------------------------------------------------------------->
+  // Allumage/éteignage du système :
+  checkSystemSwitch();
   
-  /* 
-    Si le système est éteint et que le bouton est appuyé, le système s'allume.
-    Si le système est allumé et que le bouton et appuyez, le système s’éteint.
-  */
-  
-  if (digitalRead(SWITCH) == HIGH && systemArmed == false)
+  // Si le système est allumé :
+  if (systemArmed)
   {
-    delay(DELAY_ACTIVATION);
-    armSystem();
-  }
-  else if (digitalRead(SWITCH) == HIGH && systemArmed == true)
-  {
-    disarmSystem();
-    delay(DELAY_ACTIVATION);
-  }
+    // Vérifie l'intensité du son capté :
+    checkSoundInputs();
 
-  // -------------------------------------------------------------------------------------> 
-  
-  if (systemArmed) {
-    for(int i = 0; i < SOUND_INPUTS; i++)
+    // Si le est plus fort que le seul de sensibilité de l'alarme :
+    if (soundIsLouderThenThreshold && !alarmTriggered)
     {
-      if(analogRead(SOUND_INPUT_PINS[i]) > THRESHOLD_SOUND)
-      {
-        warn();
-        delay(DELAY_DETECTION);
-        warningLevel = warningLevel + 1;   
-      }
+      // Déclenche l'alarme :
+      triggerAlarm();
     }
   }
-
-  delay(10);
 }
