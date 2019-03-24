@@ -24,9 +24,6 @@ const long DELAY_SYSTEM_ACTIVATION = 500;
 const long DELAY_TRIGGER_ALARM = 100;
 const long INTERVAL = 1000;
 
-// Temps depuis que le sketch a démarré :
-unsigned long timeSinceProgramStarted;
-
 // Délai pour allumer le système :
 unsigned long timeWhenOnSwitchTouched = 0;
 unsigned long timeSinceOnSwitchTouched = 0;
@@ -54,6 +51,9 @@ unsigned long timeWhenAlarmWasTriggered = 0;
 // Message à envoyer via le module RF 433Mhz :
 const char *MESSAGE = "Hello world!";
 
+// Temps depuis que le sketch a démarré :
+unsigned long timeSinceProgramStarted;
+
 
 
 
@@ -78,9 +78,9 @@ void setup() {
 
 
 
-void sendRadioSignal() {
-  // rh_driver.send((uint8_t *)MESSAGE, strlen(MESSAGE));
-  // rh_driver.waitPacketSent();
+void sendRadioMessage() {
+  rh_driver.send((uint8_t *)MESSAGE, strlen(MESSAGE));
+  rh_driver.waitPacketSent();
 }
 
 
@@ -198,7 +198,7 @@ void checkLightInput() {
 
 void triggerAlarm() {
   digitalWrite(LED_BUILTIN, HIGH);
-  sendRadioSignal();
+  sendRadioMessage();
   
   alarmTriggered = true;
 
