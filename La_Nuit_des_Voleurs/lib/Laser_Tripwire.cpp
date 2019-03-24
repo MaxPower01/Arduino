@@ -84,8 +84,8 @@ void setup() {
   vw_set_tx_pin(TRANSMIT_PIN);
   vw_setup(2000);	 // Bits per sec
 
-  testValue1 = 0;
-  testValue2 = 1;
+  testValue1 = 500;
+  testValue2 = 1000;
 }
 
 
