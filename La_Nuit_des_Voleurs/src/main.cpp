@@ -2,11 +2,12 @@
 
 // Librairies à inclure :
 #include <Arduino.h>
-#include <RH_ASK.h>
-#include <SPI.h>
+// #include <RH_ASK.h>
+// #include <SPI.h>
+#include <VirtualWire.h>
 
 // Instances de classes :
-RH_ASK rh_driver;
+// RH_ASK rh_driver;
 
 // Pattes du Arduino :
 const byte SWITCH = 2;
@@ -23,9 +24,6 @@ int light;
 const long DELAY_SYSTEM_ACTIVATION = 500;
 const long DELAY_TRIGGER_ALARM = 100;
 const long INTERVAL = 1000;
-
-// Temps depuis que le sketch a démarré :
-unsigned long timeSinceProgramStarted;
 
 // Délai pour allumer le système :
 unsigned long timeWhenOnSwitchTouched = 0;
@@ -54,6 +52,15 @@ unsigned long timeWhenAlarmWasTriggered = 0;
 // Message à envoyer via le module RF 433Mhz :
 const char *MESSAGE = "Hello world!";
 
+// Temps depuis que le sketch a démarré :
+unsigned long timeSinceProgramStarted;
+
+// Test Virtual wire :
+const int TRANSMIT_PIN = 12;
+unsigned int testValue1;
+unsigned int testValue2;
+uint8_t valArray[4];
+
 
 
 
@@ -63,24 +70,36 @@ void setup() {
   Serial.begin(9600);
 
   // Initialisation de la communication radio :
-  if (!rh_driver.init())
-  {
-    Serial.println("init failed");
-  }
+  // if (!rh_driver.init())
+  // {
+  //   Serial.println("init failed");
+  // }
 
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(SWITCH, INPUT);
   pinMode(LASER, OUTPUT);
   pinMode(LIGHT_SENSOR, INPUT);
+
+  // Test Virtual Wire :
+  vw_set_tx_pin(TRANSMIT_PIN);
+  vw_setup(2000);	 // Bits per sec
+
+  testValue1 = 0;
+  testValue2 = 1;
 }
 
 
 
 
 
-void sendRadioSignal() {
+void sendRadioMessage() {
   // rh_driver.send((uint8_t *)MESSAGE, strlen(MESSAGE));
   // rh_driver.waitPacketSent();
+
+  // Test Virtual Wire :
+  vw_send((uint8_t *)valArray, 6);
+  vw_wait_tx();
+  delay(200);
 }
 
 
@@ -198,9 +217,12 @@ void checkLightInput() {
 
 void triggerAlarm() {
   digitalWrite(LED_BUILTIN, HIGH);
-  sendRadioSignal();
+  sendRadioMessage();
   
   alarmTriggered = true;
+
+  testValue1 = testValue1 + 1;
+  testValue2 = testValue2 + 1;
 
   // Debug :
   // Serial.println(timeSinceProgramStarted);
@@ -211,6 +233,13 @@ void triggerAlarm() {
 
 
 void loop() {
+  // Test Virtual Wire :
+  valArray[0] = (testValue1) >> 8;
+  valArray[1] = (testValue1) % 256;
+  valArray[2] = (testValue2) >> 8;
+  valArray[3] = (testValue2) % 256;
+
+
   // Lecture des données du capteur de lumière :
   light = analogRead(LIGHT_SENSOR);
 
