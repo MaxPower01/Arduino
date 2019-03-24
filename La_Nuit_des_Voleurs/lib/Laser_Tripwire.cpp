@@ -57,9 +57,9 @@ unsigned long timeSinceProgramStarted;
 
 // Test Virtual wire :
 const int TRANSMIT_PIN = 12;
-unsigned int testValue1;
-unsigned int testValue2;
-uint8_t valArray[4];
+unsigned int setAlarm;
+unsigned int test;
+uint8_t radioSignalArray[4];
 
 
 
@@ -84,8 +84,8 @@ void setup() {
   vw_set_tx_pin(TRANSMIT_PIN);
   vw_setup(2000);	 // Bits per sec
 
-  testValue1 = 500;
-  testValue2 = 1000;
+  setAlarm = 0;
+  test = 0;
 }
 
 
@@ -96,10 +96,14 @@ void sendRadioMessage() {
   // rh_driver.send((uint8_t *)MESSAGE, strlen(MESSAGE));
   // rh_driver.waitPacketSent();
 
-  // Test Virtual Wire :
-  vw_send((uint8_t *)valArray, 6);
-  vw_wait_tx();
-  delay(200);
+  updateRadioSignalArray();
+
+  for(size_t i = 0; i < 3; i++)
+  {
+    vw_send((uint8_t *)radioSignalArray, 4);
+    vw_wait_tx();
+    delay(200);
+  }
 }
 
 
@@ -116,6 +120,8 @@ void disarmSystem() {
   somethingTouchedTheLaser = false;
   alarmTriggered = false;
   systemArmed = false;
+  setAlarm = 0;
+  sendRadioMessage();
 }
 
 
@@ -217,15 +223,16 @@ void checkLightInput() {
 
 void triggerAlarm() {
   digitalWrite(LED_BUILTIN, HIGH);
+  setAlarm = 1;
   sendRadioMessage();
-  
   alarmTriggered = true;
+}
 
-  testValue1 = testValue1 + 1;
-  testValue2 = testValue2 + 1;
-
-  // Debug :
-  // Serial.println(timeSinceProgramStarted);
+void updateRadioSignalArray() {
+  radioSignalArray[0] = (setAlarm) >> 8;
+  radioSignalArray[1] = (setAlarm) % 256;
+  radioSignalArray[2] = (test) >> 8;
+  radioSignalArray[3] = (test) % 256;
 }
 
 
@@ -233,13 +240,6 @@ void triggerAlarm() {
 
 
 void loop() {
-  // Test Virtual Wire :
-  valArray[0] = (testValue1) >> 8;
-  valArray[1] = (testValue1) % 256;
-  valArray[2] = (testValue2) >> 8;
-  valArray[3] = (testValue2) % 256;
-
-
   // Lecture des données du capteur de lumière :
   light = analogRead(LIGHT_SENSOR);
 
