@@ -7,7 +7,6 @@
 // Pattes du Arduino :
 const byte SWITCH = 2;
 const byte LASER = 7;
-const int RECEIVE_PIN = 11;
 const int TRANSMIT_PIN = 12;
 const byte LIGHT_SENSOR = A5;
 
@@ -50,8 +49,8 @@ unsigned long timeWhenAlarmWasTriggered = 0;
 unsigned long timeSinceProgramStarted;
 
 // Virtual wire :
-unsigned int vw_alarm, vw_value_2, vw_value_3, vw_value_4;
-uint8_t vw_array[8];
+unsigned int vw_s_alarm, vw_s_value_2, vw_s_value_3, vw_s_value_4;
+uint8_t vw_s_array[8];
 
 
 
@@ -65,38 +64,37 @@ void setup() {
   pinMode(LASER, OUTPUT);
   pinMode(LIGHT_SENSOR, INPUT);
 
-  vw_set_rx_pin(RECEIVE_PIN);
   vw_set_tx_pin(TRANSMIT_PIN);
   vw_setup(2000);
 
-  vw_alarm = 0;
-  vw_value_2 = 0;
-  vw_value_3 = 0;
-  vw_value_4 = 0;
+  vw_s_alarm = 0;
+  vw_s_value_2 = 0;
+  vw_s_value_3 = 0;
+  vw_s_value_4 = 0;
 }
 
 
 
 
 
-void updateVirtualWireArray() {
-  vw_array[0] = (vw_alarm) >> 8;
-  vw_array[1] = (vw_alarm) % 256;
-  vw_array[2] = (vw_value_2) >> 8;
-  vw_array[3] = (vw_value_2) % 256;
-  vw_array[4] = (vw_value_3) >> 8;
-  vw_array[5] = (vw_value_3) % 256;
-  vw_array[6] = (vw_value_4) >> 8;
-  vw_array[7] = (vw_value_4) % 256;
+void updateVwArray() {
+  vw_s_array[0] = (vw_s_alarm) >> 8;
+  vw_s_array[1] = (vw_s_alarm) % 256;
+  vw_s_array[2] = (vw_s_value_2) >> 8;
+  vw_s_array[3] = (vw_s_value_2) % 256;
+  vw_s_array[4] = (vw_s_value_3) >> 8;
+  vw_s_array[5] = (vw_s_value_3) % 256;
+  vw_s_array[6] = (vw_s_value_4) >> 8;
+  vw_s_array[7] = (vw_s_value_4) % 256;
 }
 
 
-void sendRadioMessage() {
-  updateVirtualWireArray();
+void sendVwArray() {
+  updateVwArray();
 
-  for(size_t i = 0; i < 3; i++)
+  for(size_t i = 0; i < 2; i++)
   {
-    vw_send((uint8_t *)vw_array, 8);
+    vw_send((uint8_t *)vw_s_array, 8);
     vw_wait_tx();
     delay(200);
   }
@@ -116,8 +114,8 @@ void disarmSystem() {
   somethingTouchedTheLaser = false;
   alarmTriggered = false;
   systemArmed = false;
-  vw_alarm = 0;
-  sendRadioMessage();
+  vw_s_alarm = 0;
+  sendVwArray();
 }
 
 
@@ -219,8 +217,8 @@ void checkLightInput() {
 
 void triggerAlarm() {
   digitalWrite(LED_BUILTIN, HIGH);
-  vw_alarm = 1;
-  sendRadioMessage();
+  vw_s_alarm = 1;
+  sendVwArray();
   alarmTriggered = true;
 }
 
@@ -229,10 +227,6 @@ void triggerAlarm() {
 
 
 void loop() {
-  uint8_t buf[VW_MAX_MESSAGE_LEN];
-  uint8_t buflen = VW_MAX_MESSAGE_LEN;
-  uint16_t vw_alarm, vw_value_2, vw_value_3, vw_value_4;
-
   // Lecture des données du capteur de lumière :
   light = analogRead(LIGHT_SENSOR);
 

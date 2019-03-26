@@ -24,8 +24,8 @@ bool alarmIsOn = false;
 bool buzzerState = LOW;
 
 // Virtual wire :
-unsigned int vw_alarm, vw_value_2, vw_value_3, vw_value_4;
-uint8_t vw_array[8];
+unsigned int vw_r_alarm, vw_r_value_2, vw_r_value_3, vw_r_value_4;
+uint8_t vw_s_array[8];
 
 
 
@@ -39,13 +39,8 @@ void setup() {
   pinMode(BUZZER_2, OUTPUT);
 
   vw_set_rx_pin(RECEIVE_PIN);
-  vw_set_tx_pin(TRANSMIT_PIN);
   vw_setup(2000);
   vw_rx_start();
-  vw_alarm = 0;
-  vw_value_2 = 0;
-  vw_value_3 = 0;
-  vw_value_4 = 0;
 }
 
 
@@ -53,28 +48,28 @@ void setup() {
 
 
 void loop() {
-  timeSinceProgramStarted = millis();
-
   uint8_t buf[VW_MAX_MESSAGE_LEN];
   uint8_t buflen = VW_MAX_MESSAGE_LEN;
-  uint16_t vw_alarm, vw_value_2, vw_value_3, vw_value_4;
+  uint16_t vw_r_alarm, vw_r_value_2, vw_r_value_3, vw_r_value_4;
+  
+  timeSinceProgramStarted = millis();
 
   if (vw_get_message(buf, &buflen)) {
     //Données de type uint8 reçues, conversion en type uint16 :
     if (buflen == 8) {
-      vw_alarm =  buf[0]; vw_alarm = (vw_alarm << 8) +  buf[1];
-      vw_value_2 =  buf[2]; vw_value_2 = (vw_value_2 << 8) +  buf[3];
-      vw_value_3 =  buf[4]; vw_value_3 = (vw_value_3 << 8) +  buf[5];
-      vw_value_4 =  buf[6]; vw_value_4 = (vw_value_4 << 8) +  buf[7];
+      vw_r_alarm =  buf[0]; vw_r_alarm = (vw_r_alarm << 8) +  buf[1];
+      vw_r_value_2 =  buf[2]; vw_r_value_2 = (vw_r_value_2 << 8) +  buf[3];
+      vw_r_value_3 =  buf[4]; vw_r_value_3 = (vw_r_value_3 << 8) +  buf[5];
+      vw_r_value_4 =  buf[6]; vw_r_value_4 = (vw_r_value_4 << 8) +  buf[7];
     }
 
-    Serial.println(vw_alarm);
+    Serial.println(vw_r_alarm);
 
-    if (vw_alarm == 1) {
+    if (vw_r_alarm == 1) {
       alarm = true;
     }
 
-    else if (vw_alarm == 0) {
+    else if (vw_r_alarm == 0) {
       alarm = false;
       alarmIsOn = false;
       digitalWrite(BUZZER_1, LOW);
