@@ -48,7 +48,7 @@ unsigned long timeWhenAlarmWasTriggered = 0;
 // Temps depuis que le sketch a démarré :
 unsigned long timeSinceProgramStarted;
 
-// Virtual wire :
+// Virtual wire (s = send):
 unsigned int vw_s_alarm, vw_s_value_2, vw_s_value_3, vw_s_value_4;
 uint8_t vw_s_array[8];
 
@@ -73,10 +73,6 @@ void setup() {
   vw_s_value_4 = 0;
 }
 
-
-
-
-
 void updateVwArray() {
   vw_s_array[0] = (vw_s_alarm) >> 8;
   vw_s_array[1] = (vw_s_alarm) % 256;
@@ -88,29 +84,25 @@ void updateVwArray() {
   vw_s_array[7] = (vw_s_value_4) % 256;
 }
 
-
 void sendVwArray() {
   updateVwArray();
 
-  for(size_t i = 0; i < 2; i++)
-  {
-    vw_send((uint8_t *)vw_s_array, 8);
+  for (size_t i = 0; i < 2; i++) {
+    vw_send((uint8_t * ) vw_s_array, 8);
     vw_wait_tx();
     delay(200);
   }
 }
-
 
 void armSystem() {
   digitalWrite(LASER, HIGH);
   systemArmed = true;
 }
 
-
 void disarmSystem() {
   digitalWrite(LASER, LOW);
   digitalWrite(LED_BUILTIN, LOW);
-  
+
   somethingTouchedTheLaser = false;
   alarmTriggered = false;
   systemArmed = false;
@@ -118,31 +110,22 @@ void disarmSystem() {
   sendVwArray();
 }
 
-
 void checkSystemSwitch() {
   // ---------------------------------------- ON
   // Pendant que le bouton est appuyé et que le système est éteint :
-  if (systemArmed == false && digitalRead(SWITCH) == HIGH)
-  {
+  if (systemArmed == false && digitalRead(SWITCH) == HIGH) {
     // Si le bouton a déjà été appuyé :
-    if (!onSwitchIsBeingTouched)
-    {
+    if (!onSwitchIsBeingTouched) {
       // Prend en note le temps :
       timeWhenOnSwitchTouched = timeSinceProgramStarted;
-
       // Signal que le bouton a déjà été appuyé :
       onSwitchIsBeingTouched = true;
-    }
-
-    // Sinon :
-    else
-    {
+    } else {
       // Met à jour le temps écoulé depuis que le bouton a été appuyé la première fois :
       timeSinceOnSwitchTouched = timeSinceProgramStarted - timeWhenOnSwitchTouched;
 
       // Si le temps écoulé depuis est plus grand que le délai :
-      if (timeSinceOnSwitchTouched >= DELAY_SYSTEM_ACTIVATION)
-      {
+      if (timeSinceOnSwitchTouched >= DELAY_SYSTEM_ACTIVATION) {
         // Active le système :
         armSystem();
 
@@ -150,70 +133,46 @@ void checkSystemSwitch() {
         onSwitchIsBeingTouched = false;
       }
     }
-  }
-
-  // Dès que le bouton n'est plus appuyé, réinitialiser son état :
-  else
-  {
+  } else {
+    // Dès que le bouton n'est plus appuyé, réinitialiser son état :
     onSwitchIsBeingTouched = false;
   }
 
-  // ---------------------------------------- OFF (fonctionnement identique à "ON")
-  if (systemArmed == true && digitalRead(SWITCH) == HIGH)
-  {
-    if (!offSwitchIsBeingTouched)
-    {
+  // ---------------------------------------- OFF
+  if (systemArmed == true && digitalRead(SWITCH) == HIGH) {
+    if (!offSwitchIsBeingTouched) {
       timeWhenOffSwitchTouched = timeSinceProgramStarted;
       offSwitchIsBeingTouched = true;
-    }
-
-    else
-    {
+    } else {
       timeSinceOffSwitchTouched = timeSinceProgramStarted - timeWhenOffSwitchTouched;
 
-      if (timeSinceOffSwitchTouched >= DELAY_SYSTEM_ACTIVATION)
-      {
+      if (timeSinceOffSwitchTouched >= DELAY_SYSTEM_ACTIVATION) {
         disarmSystem();
         offSwitchIsBeingTouched = false;
       }
     }
-  }
-
-  else
-  {
+  } else {
     offSwitchIsBeingTouched = false;
   }
 }
 
-
 void checkLightInput() {
   // Fonction presque identique à "checkSystemSwitch" :
-  if (light <= THRESHOLD_LIGHT)
-    {
-      if (!lightInputDropped)
-      {
-        timeWhenLightInputDropped = timeSinceProgramStarted;
-        lightInputDropped = true;
-      }
-
-      else
-      {
-        timeSinceLightInputDropped = timeSinceProgramStarted - timeWhenLightInputDropped;
-
-        if (timeSinceLightInputDropped >= DELAY_TRIGGER_ALARM)
-        {
-          somethingTouchedTheLaser = true;
-          lightInputDropped = false;
-        }
+  if (light <= THRESHOLD_LIGHT) {
+    if (!lightInputDropped) {
+      timeWhenLightInputDropped = timeSinceProgramStarted;
+      lightInputDropped = true;
+    } else {
+      timeSinceLightInputDropped = timeSinceProgramStarted - timeWhenLightInputDropped;
+      if (timeSinceLightInputDropped >= DELAY_TRIGGER_ALARM) {
+        somethingTouchedTheLaser = true;
+        lightInputDropped = false;
       }
     }
-
-    else
-    {
-      lightInputDropped = false;
-    }
+  } else {
+    lightInputDropped = false;
+  }
 }
-
 
 void triggerAlarm() {
   digitalWrite(LED_BUILTIN, HIGH);
@@ -221,10 +180,6 @@ void triggerAlarm() {
   sendVwArray();
   alarmTriggered = true;
 }
-
-
-
-
 
 void loop() {
   // Lecture des données du capteur de lumière :
@@ -237,14 +192,12 @@ void loop() {
   checkSystemSwitch();
 
   // Si le système est allumé :
-  if (systemArmed)
-  {
+  if (systemArmed) {
     // Vérifie l'intensité de la lumière captée :
     checkLightInput();
 
     // Si quelque chose a touché le laser sans que l'alarme soit délà active :
-    if (somethingTouchedTheLaser && !alarmTriggered)
-    {
+    if (somethingTouchedTheLaser && !alarmTriggered) {
       // Déclenche l'alarme :
       triggerAlarm();
     }
