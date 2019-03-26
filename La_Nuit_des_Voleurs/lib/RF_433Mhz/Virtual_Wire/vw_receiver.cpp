@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <VirtualWire.h>
 
+const int TRANSMIT_PIN = 12;
 const int RECEIVE_PIN = 11;
 bool alarm = false;
 int setAlarm, test;
@@ -11,7 +12,9 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);       
 
   // Virtual Wire :
-  vw_set_tx_pin(RECEIVE_PIN);
+  
+  vw_set_tx_pin(TRANSMIT_PIN);
+  vw_set_rx_pin(RECEIVE_PIN);
   vw_setup(2000);     
   
   // Start the receiver PLL running

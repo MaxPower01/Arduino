@@ -4,9 +4,10 @@
 #include <VirtualWire.h>
 
 // Pattes du Arduino :
-const int RECEIVE_PIN = 11;
 const byte BUZZER_1 = 2;
 const byte BUZZER_2 = 3;
+const int RECEIVE_PIN = 11;
+const int TRANSMIT_PIN = 12;
 
 // État de l'alarme :
 bool alarm = false;
@@ -22,30 +23,29 @@ unsigned long timeSinceBuzzerIsOn = 0;
 bool alarmIsOn = false;
 bool buzzerState = LOW;
 
-// Données à recevoir via le module RF 433Mhz :
-int setAlarm, test;
+// Virtual wire :
+unsigned int vw_alarm, vw_value_2, vw_value_3, vw_value_4;
+uint8_t vw_array[8];
 
 
 
 
 
 void setup() {
-  // Initialisation de la communication série :
   Serial.begin(9600);
 
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(BUZZER_1, OUTPUT);
   pinMode(BUZZER_2, OUTPUT);
 
-  // Virtual Wire :
-  vw_set_tx_pin(RECEIVE_PIN);
+  vw_set_rx_pin(RECEIVE_PIN);
+  vw_set_tx_pin(TRANSMIT_PIN);
   vw_setup(2000);
-
-  // Start the receiver PLL running
   vw_rx_start();
-
-  setAlarm = 0;
-  test = 0;
+  vw_alarm = 0;
+  vw_value_2 = 0;
+  vw_value_3 = 0;
+  vw_value_4 = 0;
 }
 
 
@@ -57,25 +57,28 @@ void loop() {
 
   uint8_t buf[VW_MAX_MESSAGE_LEN];
   uint8_t buflen = VW_MAX_MESSAGE_LEN;
-  uint16_t setAlarm, test;
+  uint16_t vw_alarm, vw_value_2, vw_value_3, vw_value_4;
 
   if (vw_get_message(buf, &buflen)) {
     //Données de type uint8 reçues, conversion en type uint16 :
-    if (buflen == 4) {
-      setAlarm =  buf[0]; setAlarm = (setAlarm << 8) +  buf[1];
-      test =  buf[2]; test = (test << 8) +  buf[3];
+    if (buflen == 8) {
+      vw_alarm =  buf[0]; vw_alarm = (vw_alarm << 8) +  buf[1];
+      vw_value_2 =  buf[2]; vw_value_2 = (vw_value_2 << 8) +  buf[3];
+      vw_value_3 =  buf[4]; vw_value_3 = (vw_value_3 << 8) +  buf[5];
+      vw_value_4 =  buf[6]; vw_value_4 = (vw_value_4 << 8) +  buf[7];
     }
 
-    Serial.println(setAlarm);
+    Serial.println(vw_alarm);
 
-    if (setAlarm == 1) {
+    if (vw_alarm == 1) {
       alarm = true;
     }
 
-    else if (setAlarm == 0) {
+    else if (vw_alarm == 0) {
       alarm = false;
       alarmIsOn = false;
       digitalWrite(BUZZER_1, LOW);
+      digitalWrite(LED_BUILTIN, LOW);
     }
   }
 

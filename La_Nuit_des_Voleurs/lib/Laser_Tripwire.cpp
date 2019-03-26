@@ -1,17 +1,14 @@
 // -------------------- FIL DE DÉCLENCHEMENT AU LASER -------------------- //
 
-// Librairies à inclure :
+// Librairies :
 #include <Arduino.h>
-// #include <RH_ASK.h>
-// #include <SPI.h>
 #include <VirtualWire.h>
-
-// Instances de classes :
-// RH_ASK rh_driver;
 
 // Pattes du Arduino :
 const byte SWITCH = 2;
 const byte LASER = 7;
+const int RECEIVE_PIN = 11;
+const int TRANSMIT_PIN = 12;
 const byte LIGHT_SENSOR = A5;
 
 // Capteur de lumière :
@@ -49,58 +46,57 @@ bool somethingTouchedTheLaser = false;
 bool alarmTriggered = false;
 unsigned long timeWhenAlarmWasTriggered = 0;
 
-// Message à envoyer via le module RF 433Mhz :
-const char *MESSAGE = "Hello world!";
-
 // Temps depuis que le sketch a démarré :
 unsigned long timeSinceProgramStarted;
 
-// Test Virtual wire :
-const int TRANSMIT_PIN = 12;
-unsigned int setAlarm;
-unsigned int test;
-uint8_t radioSignalArray[4];
+// Virtual wire :
+unsigned int vw_alarm, vw_value_2, vw_value_3, vw_value_4;
+uint8_t vw_array[8];
 
 
 
 
 
 void setup() {
-  // Initialisation de la communication série :
   Serial.begin(9600);
-
-  // Initialisation de la communication radio :
-  // if (!rh_driver.init())
-  // {
-  //   Serial.println("init failed");
-  // }
 
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(SWITCH, INPUT);
   pinMode(LASER, OUTPUT);
   pinMode(LIGHT_SENSOR, INPUT);
 
-  // Test Virtual Wire :
+  vw_set_rx_pin(RECEIVE_PIN);
   vw_set_tx_pin(TRANSMIT_PIN);
-  vw_setup(2000);	 // Bits per sec
+  vw_setup(2000);
 
-  setAlarm = 0;
-  test = 0;
+  vw_alarm = 0;
+  vw_value_2 = 0;
+  vw_value_3 = 0;
+  vw_value_4 = 0;
 }
 
 
 
 
 
-void sendRadioMessage() {
-  // rh_driver.send((uint8_t *)MESSAGE, strlen(MESSAGE));
-  // rh_driver.waitPacketSent();
+void updateVirtualWireArray() {
+  vw_array[0] = (vw_alarm) >> 8;
+  vw_array[1] = (vw_alarm) % 256;
+  vw_array[2] = (vw_value_2) >> 8;
+  vw_array[3] = (vw_value_2) % 256;
+  vw_array[4] = (vw_value_3) >> 8;
+  vw_array[5] = (vw_value_3) % 256;
+  vw_array[6] = (vw_value_4) >> 8;
+  vw_array[7] = (vw_value_4) % 256;
+}
 
-  updateRadioSignalArray();
+
+void sendRadioMessage() {
+  updateVirtualWireArray();
 
   for(size_t i = 0; i < 3; i++)
   {
-    vw_send((uint8_t *)radioSignalArray, 4);
+    vw_send((uint8_t *)vw_array, 8);
     vw_wait_tx();
     delay(200);
   }
@@ -120,7 +116,7 @@ void disarmSystem() {
   somethingTouchedTheLaser = false;
   alarmTriggered = false;
   systemArmed = false;
-  setAlarm = 0;
+  vw_alarm = 0;
   sendRadioMessage();
 }
 
@@ -223,16 +219,9 @@ void checkLightInput() {
 
 void triggerAlarm() {
   digitalWrite(LED_BUILTIN, HIGH);
-  setAlarm = 1;
+  vw_alarm = 1;
   sendRadioMessage();
   alarmTriggered = true;
-}
-
-void updateRadioSignalArray() {
-  radioSignalArray[0] = (setAlarm) >> 8;
-  radioSignalArray[1] = (setAlarm) % 256;
-  radioSignalArray[2] = (test) >> 8;
-  radioSignalArray[3] = (test) % 256;
 }
 
 
@@ -240,6 +229,10 @@ void updateRadioSignalArray() {
 
 
 void loop() {
+  uint8_t buf[VW_MAX_MESSAGE_LEN];
+  uint8_t buflen = VW_MAX_MESSAGE_LEN;
+  uint16_t vw_alarm, vw_value_2, vw_value_3, vw_value_4;
+
   // Lecture des données du capteur de lumière :
   light = analogRead(LIGHT_SENSOR);
 
