@@ -7,7 +7,7 @@
 // Pattes du Arduino :
 const byte SWITCH = 2;
 const byte LASER = 7;
-const int TRANSMIT_PIN = 12;
+const int VW_TRANSMIT_PIN = 12;
 const byte LIGHT_SENSOR = A5;
 
 // Capteur de lumière :
@@ -64,7 +64,7 @@ void setup() {
   pinMode(LASER, OUTPUT);
   pinMode(LIGHT_SENSOR, INPUT);
 
-  vw_set_tx_pin(TRANSMIT_PIN);
+  vw_set_tx_pin(VW_TRANSMIT_PIN);
   vw_setup(2000);
 
   vw_s_alarm = 0;
