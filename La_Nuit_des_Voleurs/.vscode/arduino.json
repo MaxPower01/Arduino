@@ -1,5 +1,5 @@
 {
     "board": "arduino:avr:uno",
-    "port": "COM8",
+    "port": "COM1",
     "programmer": "AVRISP mkII"
 }

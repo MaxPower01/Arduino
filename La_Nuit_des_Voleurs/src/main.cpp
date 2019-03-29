@@ -1,55 +1,29 @@
-// -------------------- FIL DE DÉCLENCHEMENT AU LASER -------------------- //
+// -------------------- ALARME -------------------- //
 
-// Librairies :
 #include <Arduino.h>
 #include <VirtualWire.h>
 
 // Pattes du Arduino :
-const byte SWITCH = 2;
-const byte LASER = 7;
-const int VW_TRANSMIT_PIN = 12;
-const byte LIGHT_SENSOR = A5;
-
-// Capteur de lumière :
-const int THRESHOLD_LIGHT = 300;
-
-// Intensité de la lumière captée :
-int light;
-
-// Délais et intervals utilisés dans le sketch :
-const long DELAY_SYSTEM_ACTIVATION = 500;
-const long DELAY_TRIGGER_ALARM = 100;
-const long INTERVAL = 1000;
-
-// Délai pour allumer le système :
-unsigned long timeWhenOnSwitchTouched = 0;
-unsigned long timeSinceOnSwitchTouched = 0;
-bool onSwitchIsBeingTouched = false;
-
-// Délai pour éteindre le système :
-unsigned long timeWhenOffSwitchTouched = 0;
-unsigned long timeSinceOffSwitchTouched = 0;
-bool offSwitchIsBeingTouched = false;
-
-// État du système :
-bool systemArmed = false;
-bool systemPaused = false;
-
-// Délai pour déclencher l'alarme :
-unsigned long timeWhenLightInputDropped = 0;
-unsigned long timeSinceLightInputDropped = 0;
-unsigned long lightInputDropped = false;
+const byte BUZZER_1 = 2;
+const byte BUZZER_2 = 3;
+const int VW_RECEIVE_PIN = 11;
 
 // État de l'alarme :
-bool somethingTouchedTheLaser = false;
-bool alarmTriggered = false;
-unsigned long timeWhenAlarmWasTriggered = 0;
+bool alarm = false;
 
 // Temps depuis que le sketch a démarré :
 unsigned long timeSinceProgramStarted;
 
-// Virtual wire (s = send):
-unsigned int vw_s_alarm, vw_s_value_2, vw_s_value_3, vw_s_value_4;
+// Interval pour le son du buzzer :
+const int INTERVAL_BUZZER = 500;
+unsigned long timeWhenAlarmTriggered = 0;
+unsigned long timeSinceAlarmOn = 0;
+unsigned long timeSinceBuzzerOn = 0;
+bool alarmTriggered = false;
+bool buzzerState = LOW;
+
+// Virtual wire (r = receive):
+unsigned int vw_r_alarm, vw_r_value_2, vw_r_value_3, vw_r_value_4;
 uint8_t vw_s_array[8];
 
 
@@ -60,146 +34,69 @@ void setup() {
   Serial.begin(9600);
 
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(SWITCH, INPUT);
-  pinMode(LASER, OUTPUT);
-  pinMode(LIGHT_SENSOR, INPUT);
+  pinMode(BUZZER_1, OUTPUT);
+  pinMode(BUZZER_2, OUTPUT);
 
-  vw_set_tx_pin(VW_TRANSMIT_PIN);
+  vw_set_rx_pin(VW_RECEIVE_PIN);
   vw_setup(2000);
-
-  vw_s_alarm = 0;
-  vw_s_value_2 = 0;
-  vw_s_value_3 = 0;
-  vw_s_value_4 = 0;
+  vw_rx_start();
 }
 
-void updateVwArray() {
-  vw_s_array[0] = (vw_s_alarm) >> 8;
-  vw_s_array[1] = (vw_s_alarm) % 256;
-  vw_s_array[2] = (vw_s_value_2) >> 8;
-  vw_s_array[3] = (vw_s_value_2) % 256;
-  vw_s_array[4] = (vw_s_value_3) >> 8;
-  vw_s_array[5] = (vw_s_value_3) % 256;
-  vw_s_array[6] = (vw_s_value_4) >> 8;
-  vw_s_array[7] = (vw_s_value_4) % 256;
-}
 
-void sendVwArray() {
-  updateVwArray();
 
-  for (size_t i = 0; i < 2; i++) {
-    vw_send((uint8_t * ) vw_s_array, 8);
-    vw_wait_tx();
-    delay(200);
-  }
-}
 
-void armSystem() {
-  digitalWrite(LASER, HIGH);
-  systemArmed = true;
-}
-
-void disarmSystem() {
-  digitalWrite(LASER, LOW);
-  digitalWrite(LED_BUILTIN, LOW);
-
-  somethingTouchedTheLaser = false;
-  alarmTriggered = false;
-  systemArmed = false;
-  vw_s_alarm = 0;
-  sendVwArray();
-}
-
-void checkSystemSwitch() {
-  // ---------------------------------------- ON
-  // Pendant que le bouton est appuyé et que le système est éteint :
-  if (systemArmed == false && digitalRead(SWITCH) == HIGH) {
-    // Si le bouton a déjà été appuyé :
-    if (!onSwitchIsBeingTouched) {
-      // Prend en note le temps :
-      timeWhenOnSwitchTouched = timeSinceProgramStarted;
-      // Signal que le bouton a déjà été appuyé :
-      onSwitchIsBeingTouched = true;
-    } else {
-      // Met à jour le temps écoulé depuis que le bouton a été appuyé la première fois :
-      timeSinceOnSwitchTouched = timeSinceProgramStarted - timeWhenOnSwitchTouched;
-
-      // Si le temps écoulé depuis est plus grand que le délai :
-      if (timeSinceOnSwitchTouched >= DELAY_SYSTEM_ACTIVATION) {
-        // Active le système :
-        armSystem();
-
-        // Réinitialise l'état du bouton en spécifiant qu'il n'a maintenant plus été appuyé :
-        onSwitchIsBeingTouched = false;
-      }
-    }
-  } else {
-    // Dès que le bouton n'est plus appuyé, réinitialiser son état :
-    onSwitchIsBeingTouched = false;
-  }
-
-  // ---------------------------------------- OFF
-  if (systemArmed == true && digitalRead(SWITCH) == HIGH) {
-    if (!offSwitchIsBeingTouched) {
-      timeWhenOffSwitchTouched = timeSinceProgramStarted;
-      offSwitchIsBeingTouched = true;
-    } else {
-      timeSinceOffSwitchTouched = timeSinceProgramStarted - timeWhenOffSwitchTouched;
-
-      if (timeSinceOffSwitchTouched >= DELAY_SYSTEM_ACTIVATION) {
-        disarmSystem();
-        offSwitchIsBeingTouched = false;
-      }
-    }
-  } else {
-    offSwitchIsBeingTouched = false;
-  }
-}
-
-void checkLightInput() {
-  // Fonction presque identique à "checkSystemSwitch" :
-  if (light <= THRESHOLD_LIGHT) {
-    if (!lightInputDropped) {
-      timeWhenLightInputDropped = timeSinceProgramStarted;
-      lightInputDropped = true;
-    } else {
-      timeSinceLightInputDropped = timeSinceProgramStarted - timeWhenLightInputDropped;
-      if (timeSinceLightInputDropped >= DELAY_TRIGGER_ALARM) {
-        somethingTouchedTheLaser = true;
-        lightInputDropped = false;
-      }
-    }
-  } else {
-    lightInputDropped = false;
-  }
-}
-
-void triggerAlarm() {
-  digitalWrite(LED_BUILTIN, HIGH);
-  vw_s_alarm = 1;
-  sendVwArray();
-  alarmTriggered = true;
-}
 
 void loop() {
-  // Lecture des données du capteur de lumière :
-  light = analogRead(LIGHT_SENSOR);
+  uint8_t buf[VW_MAX_MESSAGE_LEN];
+  uint8_t buflen = VW_MAX_MESSAGE_LEN;
+  uint16_t vw_r_alarm, vw_r_value_2, vw_r_value_3, vw_r_value_4;
 
-  // Mise à jour du temps écoulé depuis le début du sketch :
   timeSinceProgramStarted = millis();
 
-  // Allumage/éteignage du système :
-  checkSystemSwitch();
+  if (vw_get_message(buf, & buflen)) {
+    //Données de type uint8 reçues, conversion en type uint16 :
+    if (buflen == 8) {
+      vw_r_alarm = buf[0];
+      vw_r_alarm = (vw_r_alarm << 8) + buf[1];
+      vw_r_value_2 = buf[2];
+      vw_r_value_2 = (vw_r_value_2 << 8) + buf[3];
+      vw_r_value_3 = buf[4];
+      vw_r_value_3 = (vw_r_value_3 << 8) + buf[5];
+      vw_r_value_4 = buf[6];
+      vw_r_value_4 = (vw_r_value_4 << 8) + buf[7];
+    }
 
-  // Si le système est allumé :
-  if (systemArmed) {
-    // Vérifie l'intensité de la lumière captée :
-    checkLightInput();
+    Serial.println(vw_r_alarm);
 
-    // Si quelque chose a touché le laser sans que l'alarme soit délà active :
-    if (somethingTouchedTheLaser && !alarmTriggered) {
-      // Déclenche l'alarme :
-      triggerAlarm();
+    if (vw_r_alarm == 1) {
+      alarm = true;
+    } else if (vw_r_alarm == 0) {
+      alarm = false;
+      alarmTriggered = false;
+      digitalWrite(BUZZER_1, LOW);
+      digitalWrite(LED_BUILTIN, LOW);
+    }
+  }
+
+  if (alarm) {
+    if (!alarmTriggered) {
+      timeWhenAlarmTriggered = timeSinceProgramStarted;
+      alarmTriggered = true;
+    } else {
+      timeSinceAlarmOn = timeSinceProgramStarted - timeWhenAlarmTriggered;
+
+      if (timeSinceAlarmOn - timeSinceBuzzerOn >= INTERVAL_BUZZER) {
+        timeSinceBuzzerOn = timeSinceAlarmOn;
+
+        if (buzzerState == LOW) {
+          buzzerState = HIGH;
+        } else {
+          buzzerState = LOW;
+        }
+
+        digitalWrite(BUZZER_1, buzzerState);
+        digitalWrite(LED_BUILTIN, buzzerState);
+      }
     }
   }
 }
