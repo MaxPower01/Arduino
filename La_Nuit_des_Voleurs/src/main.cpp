@@ -1,199 +1,102 @@
-// -------------------- KEYPAD 4X4 -------------------- //
+// -------------------- ALARME -------------------- //
 
 #include <Arduino.h>
-#include <Keypad.h>
-#include <Password.h>
+#include <VirtualWire.h>
 
-#define Password_Length 4
+// Pattes du Arduino :
+const byte BUZZER_1 = 2;
+const byte BUZZER_2 = 3;
+const int VW_RECEIVE_PIN = 11;
 
-Password password = Password("1*5#3"); // password
-int dlugosc = 5;                       // length of the password
-int ilosc;                             // number of clicks
+// État de l'alarme :
+bool alarm = false;
 
-const byte ROWS = 4;
-const byte COLS = 4;
+// Temps depuis que le sketch a démarré :
+unsigned long timeSinceProgramStarted;
 
-char keys[ROWS][COLS] = {
-    {'1', '2', '3', 'A'},
-    {'4', '5', '6', 'B'},
-    {'7', '8', '9', 'C'},
-    {'*', '0', '#', 'D'}};
+// Interval pour le son du buzzer :
+const int INTERVAL_BUZZER = 500;
+unsigned long timeWhenAlarmTriggered = 0;
+unsigned long timeSinceAlarmOn = 0;
+unsigned long timeSinceBuzzerOn = 0;
+bool alarmTriggered = false;
+bool buzzerState = LOW;
 
-byte rowPins[ROWS] = {10, 9, 8, 7};
-byte colPins[ROWS] = {6, 5, 4, 3};
+// Virtual wire (r = receive):
+unsigned int vw_r_alarm, vw_r_value_2, vw_r_value_3, vw_r_value_4;
+uint8_t vw_s_array[8];
 
-Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
-void checkPassword()
-{
-  if (password.evaluate())
-  {
-    int i;
-    for (i = 1; i <= 2; i++)
-    {
-      // digitalWrite(buzzer, HIGH);
-      delay(70);
-      // digitalWrite(buzzer, LOW);
-      delay(70);
-    }
-    ilosc = 0;
 
-    Serial.println("Success");
 
-    // digitalWrite(ledRed, LOW);
-    // digitalWrite(ledGreen, HIGH);
 
-    // lcd.clear();
-    // lcd.setCursor(0, 1);
-    // lcd.print(" << SUCCESS >>");
-  }
-  else
-  {
-    int i;
-    for (i = 1; i <= 1; i++)
-    {
-      // digitalWrite(buzzer, HIGH);
-      delay(200);
-      // digitalWrite(buzzer, LOW);
-      delay(200);
-    }
-    ilosc = 0;
-    password.reset();
-
-    Serial.println("Wrong");
-
-    // digitalWrite(ledGreen, LOW);
-    // digitalWrite(ledRed, HIGH);
-
-    // lcd.clear();
-    // lcd.setCursor(0, 1);
-    // lcd.print("  << WRONG >>");
-    delay(2000);
-
-    // lcd.clear();
-    // lcd.setCursor(1, 0);
-    // lcd.print("  :Welcome:");
-    // lcd.setCursor(0, 1);
-    // lcd.print("PLEASE ENTER PIN");
-  }
-}
-
-void keypadEvent(KeypadEvent eKey)
-{
-  switch (keypad.getState())
-  {
-  case PRESSED:
-
-    int i;
-    for (i = 1; i <= 1; i++)
-    {
-      // digitalWrite(buzzer, HIGH);
-      delay(50);
-      // digitalWrite(buzzer, LOW);
-      delay(50);
-    }
-
-    Serial.print("Pressed: ");
-    Serial.println(eKey);
-
-    switch (eKey)
-    {
-      /*
-case '#':
-break;
- 
-case '*':
-break;
-*/
-
-    default:
-      ilosc = ilosc + 1;
-      password.append(eKey);
-    }
-    //Serial.println(ilosc);
-
-    if (ilosc == 1)
-    {
-      // lcd.clear();
-      // lcd.setCursor(1, 0);
-      // lcd.print("   < PIN >");
-      // lcd.setCursor(0, 1);
-      // lcd.print("*_");
-    }
-    if (ilosc == 2)
-    {
-      // lcd.clear();
-      // lcd.setCursor(1, 0);
-      // lcd.print("   < PIN >");
-      // lcd.setCursor(0, 1);
-      // lcd.print("**_");
-    }
-    if (ilosc == 3)
-    {
-      // lcd.clear();
-      // lcd.setCursor(1, 0);
-      // lcd.print("   < PIN >");
-      // lcd.setCursor(0, 1);
-      // lcd.print("***_");
-    }
-    if (ilosc == 4)
-    {
-      // lcd.clear();
-      // lcd.setCursor(1, 0);
-      // lcd.print("   < PIN >");
-      // lcd.setCursor(0, 1);
-      // lcd.print("****_");
-    }
-    if (ilosc == 5)
-    {
-      // lcd.clear();
-      // lcd.setCursor(1, 0);
-      // lcd.print("   < PIN >");
-      // lcd.setCursor(0, 1);
-      // lcd.print("*****_");
-    }
-    if (ilosc == 6)
-    {
-      // lcd.clear();
-      // lcd.setCursor(1, 0);
-      // lcd.print("   < PIN >");
-      // lcd.setCursor(0, 1);
-      // lcd.print("******_");
-    }
-    if (ilosc == 7)
-    {
-      // lcd.clear();
-      // lcd.setCursor(1, 0);
-      // lcd.print("   < PIN >");
-      // lcd.setCursor(0, 1);
-      // lcd.print("*******_");
-    }
-    if (ilosc == 8)
-    {
-      // lcd.clear();
-      // lcd.setCursor(1, 0);
-      // lcd.print("   < PIN >");
-      // lcd.setCursor(0, 1);
-      // lcd.print("********");
-    }
-
-    if (ilosc == dlugosc)
-    {
-      delay(250);
-      checkPassword();
-      ilosc = 0;
-    }
-  }
-}
-
-void setup()
-{
+void setup() {
   Serial.begin(9600);
-  keypad.addEventListener(keypadEvent);
+
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(BUZZER_1, OUTPUT);
+  pinMode(BUZZER_2, OUTPUT);
+
+  vw_set_rx_pin(VW_RECEIVE_PIN);
+  vw_setup(2000);
+  vw_rx_start();
 }
 
-void loop()
-{
-  keypad.getKey();
+
+
+
+
+void loop() {
+  uint8_t buf[VW_MAX_MESSAGE_LEN];
+  uint8_t buflen = VW_MAX_MESSAGE_LEN;
+  uint16_t vw_r_alarm, vw_r_value_2, vw_r_value_3, vw_r_value_4;
+
+  timeSinceProgramStarted = millis();
+
+  if (vw_get_message(buf, & buflen)) {
+    //Données de type uint8 reçues, conversion en type uint16 :
+    if (buflen == 8) {
+      vw_r_alarm = buf[0];
+      vw_r_alarm = (vw_r_alarm << 8) + buf[1];
+      vw_r_value_2 = buf[2];
+      vw_r_value_2 = (vw_r_value_2 << 8) + buf[3];
+      vw_r_value_3 = buf[4];
+      vw_r_value_3 = (vw_r_value_3 << 8) + buf[5];
+      vw_r_value_4 = buf[6];
+      vw_r_value_4 = (vw_r_value_4 << 8) + buf[7];
+    }
+
+    Serial.println(vw_r_alarm);
+
+    if (vw_r_alarm == 1) {
+      alarm = true;
+    } else if (vw_r_alarm == 0) {
+      alarm = false;
+      alarmTriggered = false;
+      digitalWrite(BUZZER_1, LOW);
+      digitalWrite(LED_BUILTIN, LOW);
+    }
+  }
+
+  if (alarm) {
+    if (!alarmTriggered) {
+      timeWhenAlarmTriggered = timeSinceProgramStarted;
+      alarmTriggered = true;
+    } else {
+      timeSinceAlarmOn = timeSinceProgramStarted - timeWhenAlarmTriggered;
+
+      if (timeSinceAlarmOn - timeSinceBuzzerOn >= INTERVAL_BUZZER) {
+        timeSinceBuzzerOn = timeSinceAlarmOn;
+
+        if (buzzerState == LOW) {
+          buzzerState = HIGH;
+        } else {
+          buzzerState = LOW;
+        }
+
+        digitalWrite(BUZZER_1, buzzerState);
+        digitalWrite(LED_BUILTIN, buzzerState);
+      }
+    }
+  }
 }
