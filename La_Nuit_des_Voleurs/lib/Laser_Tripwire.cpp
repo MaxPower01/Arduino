@@ -12,6 +12,7 @@
 // Pattes du Arduino :
 const byte SWITCH = 2;
 const byte LASER = 7;
+const int TRANSMIT_PIN = 12;
 const byte LIGHT_SENSOR = A5;
 
 // Capteur de lumière :
@@ -56,7 +57,6 @@ const char *MESSAGE = "Hello world!";
 unsigned long timeSinceProgramStarted;
 
 // Test Virtual wire :
-const int TRANSMIT_PIN = 12;
 unsigned int setAlarm;
 unsigned int test;
 uint8_t radioSignalArray[4];
