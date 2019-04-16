@@ -1,6 +1,5 @@
 // -------------------- FIL DE DÉCLENCHEMENT AU LASER -------------------- //
 
-// Librairies :
 #include <Arduino.h>
 #include <VirtualWire.h>
 #include <Keypad.h>
@@ -54,25 +53,22 @@ unsigned long timeSinceProgramStarted;
 unsigned int vw_s_alarm, vw_s_value_2, vw_s_value_3, vw_s_value_4;
 uint8_t vw_s_array[8];
 
-// Keypad/Password :
+// Password :
 #define Password_Length 4
-
 Password password = Password("1*5#3"); // password
 int dlugosc = 5;                       // length of the password
 int ilosc;                             // number of clicks
 
+// Keypad :
 const byte ROWS = 4;
 const byte COLS = 4;
-
 char keys[ROWS][COLS] = {
     {'1', '2', '3', 'A'},
     {'4', '5', '6', 'B'},
     {'7', '8', '9', 'C'},
     {'*', '0', '#', 'D'}};
-
 byte rowPins[ROWS] = {10, 9, 8, 7};
-byte colPins[ROWS] = {6, 5, 4, 3};
-
+byte colPins[COLS] = {6, 5, 4, 3};
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
 void checkPassword()
@@ -142,14 +138,17 @@ void setup()
 {
   Serial.begin(9600);
 
+  // Pattes du Arduino :
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(SWITCH, INPUT);
   pinMode(LASER, OUTPUT);
   pinMode(LIGHT_SENSOR, INPUT);
 
+  // Modules radio :
   vw_set_tx_pin(VW_TRANSMIT_PIN);
   vw_setup(2000);
 
+  // Valeures envoyées via le module radio :
   vw_s_alarm = 0;
   vw_s_value_2 = 0;
   vw_s_value_3 = 0;
