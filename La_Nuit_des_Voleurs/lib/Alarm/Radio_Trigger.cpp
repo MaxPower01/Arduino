@@ -26,11 +26,8 @@ bool buzzerState = LOW;
 unsigned int vw_r_alarm, vw_r_value_2, vw_r_value_3, vw_r_value_4;
 uint8_t vw_s_array[8];
 
-
-
-
-
-void setup() {
+void setup()
+{
   Serial.begin(9600);
 
   pinMode(LED_BUILTIN, OUTPUT);
@@ -42,20 +39,19 @@ void setup() {
   vw_rx_start();
 }
 
-
-
-
-
-void loop() {
+void loop()
+{
   uint8_t buf[VW_MAX_MESSAGE_LEN];
   uint8_t buflen = VW_MAX_MESSAGE_LEN;
   uint16_t vw_r_alarm, vw_r_value_2, vw_r_value_3, vw_r_value_4;
 
   timeSinceProgramStarted = millis();
 
-  if (vw_get_message(buf, & buflen)) {
+  if (vw_get_message(buf, &buflen))
+  {
     //Données de type uint8 reçues, conversion en type uint16 :
-    if (buflen == 8) {
+    if (buflen == 8)
+    {
       vw_r_alarm = buf[0];
       vw_r_alarm = (vw_r_alarm << 8) + buf[1];
       vw_r_value_2 = buf[2];
@@ -68,9 +64,12 @@ void loop() {
 
     Serial.println(vw_r_alarm);
 
-    if (vw_r_alarm == 1) {
+    if (vw_r_alarm == 1)
+    {
       alarm = true;
-    } else if (vw_r_alarm == 0) {
+    }
+    else if (vw_r_alarm == 0)
+    {
       alarm = false;
       alarmTriggered = false;
       digitalWrite(BUZZER_1, LOW);
@@ -78,19 +77,27 @@ void loop() {
     }
   }
 
-  if (alarm) {
-    if (!alarmTriggered) {
+  if (alarm)
+  {
+    if (!alarmTriggered)
+    {
       timeWhenAlarmTriggered = timeSinceProgramStarted;
       alarmTriggered = true;
-    } else {
+    }
+    else
+    {
       timeSinceAlarmOn = timeSinceProgramStarted - timeWhenAlarmTriggered;
 
-      if (timeSinceAlarmOn - timeSinceBuzzerOn >= INTERVAL_BUZZER) {
+      if (timeSinceAlarmOn - timeSinceBuzzerOn >= INTERVAL_BUZZER)
+      {
         timeSinceBuzzerOn = timeSinceAlarmOn;
 
-        if (buzzerState == LOW) {
+        if (buzzerState == LOW)
+        {
           buzzerState = HIGH;
-        } else {
+        }
+        else
+        {
           buzzerState = LOW;
         }
 

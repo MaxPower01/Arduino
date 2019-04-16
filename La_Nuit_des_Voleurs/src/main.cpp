@@ -7,7 +7,8 @@
 
 // Pattes du Arduino :
 const byte LASER = 2;
-const byte LED_GREEN = 11;
+const byte LED_GREEN = 1;
+const byte LED_RED = 0;
 const int VW_TRANSMIT_PIN = 12;
 const byte SWITCH = 13;
 const byte LIGHT_SENSOR = A5;
@@ -58,10 +59,9 @@ unsigned int vw_s_alarm, vw_s_value_2, vw_s_value_3, vw_s_value_4;
 uint8_t vw_s_array[8];
 
 // Password :
-#define Password_Length 5
-Password password = Password("56794"); // password
-int dlugosc = 5;                       // length of the password
-int ilosc;                             // number of clicks
+Password password = Password("56794");
+int passwordLength = 5;
+int keypadInputLength;
 
 // Keypad :
 const byte ROWS = 4;
@@ -87,10 +87,16 @@ void checkPassword()
       // digitalWrite(buzzer, LOW);
       delay(70);
     }
-    ilosc = 0;
+    keypadInputLength = 0;
     systemUnlocked = true;
     digitalWrite(LED_GREEN, HIGH);
-    Serial.println("Success");
+    delay(250);
+    digitalWrite(LED_GREEN, LOW);
+    delay(250);
+    digitalWrite(LED_GREEN, HIGH);
+    delay(250);
+    digitalWrite(LED_GREEN, LOW);
+    // Serial.println("Success");
   }
   else
   {
@@ -100,10 +106,16 @@ void checkPassword()
       delay(200);
       delay(200);
     }
-    ilosc = 0;
+    keypadInputLength = 0;
     password.reset();
-    Serial.println("Wrong");
-    delay(2000);
+    digitalWrite(LED_RED, HIGH);
+    delay(250);
+    digitalWrite(LED_RED, LOW);
+    delay(250);
+    digitalWrite(LED_RED, HIGH);
+    delay(250);
+    digitalWrite(LED_RED, LOW);
+    delay(500);
   }
 }
 
@@ -120,30 +132,32 @@ void keypadEvent(KeypadEvent eKey)
       delay(50);
     }
 
-    Serial.print("Pressed: ");
-    Serial.println(eKey);
+    // Serial.print("Pressed: ");
+    // Serial.println(eKey);
 
     switch (eKey)
     {
     default:
-      ilosc = ilosc + 1;
+      keypadInputLength = keypadInputLength + 1;
       password.append(eKey);
     }
 
-    if (ilosc == dlugosc)
+    if (keypadInputLength == passwordLength)
     {
       delay(250);
       checkPassword();
-      ilosc = 0;
+      keypadInputLength = 0;
     }
   }
 }
 
 void setup()
 {
-  Serial.begin(9600);
+  // Serial.begin(9600);
 
   // Pattes du Arduino :
+  pinMode(LED_RED, OUTPUT);
+  pinMode(LED_GREEN, OUTPUT);
   pinMode(SWITCH, INPUT);
   pinMode(LASER, OUTPUT);
   pinMode(LIGHT_SENSOR, INPUT);
@@ -264,7 +278,7 @@ void triggerAlarm()
   vw_s_alarm = 1;
   sendVwArray();
   alarmTriggered = true;
-  Serial.print("ALARM");
+  // Serial.print("ALARM");
 }
 
 void loop()
