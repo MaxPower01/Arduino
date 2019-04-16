@@ -24,16 +24,58 @@ byte colPins[ROWS] = {6, 5, 4, 3};
 
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
-void setup()
+void checkPassword()
 {
-  Serial.begin(9600);
-  keypad.addEventListener(keypadEvent);
-  pinMode(LED_BUILTIN, OUTPUT);
-}
+  if (password.evaluate())
+  {
+    int i;
+    for (i = 1; i <= 2; i++)
+    {
+      // digitalWrite(buzzer, HIGH);
+      delay(70);
+      // digitalWrite(buzzer, LOW);
+      delay(70);
+    }
+    ilosc = 0;
 
-void loop()
-{
-  keypad.getKey();
+    Serial.println("Success");
+
+    // digitalWrite(ledRed, LOW);
+    // digitalWrite(ledGreen, HIGH);
+
+    // lcd.clear();
+    // lcd.setCursor(0, 1);
+    // lcd.print(" << SUCCESS >>");
+  }
+  else
+  {
+    int i;
+    for (i = 1; i <= 1; i++)
+    {
+      // digitalWrite(buzzer, HIGH);
+      delay(200);
+      // digitalWrite(buzzer, LOW);
+      delay(200);
+    }
+    ilosc = 0;
+    password.reset();
+
+    Serial.println("Wrong");
+
+    // digitalWrite(ledGreen, LOW);
+    // digitalWrite(ledRed, HIGH);
+
+    // lcd.clear();
+    // lcd.setCursor(0, 1);
+    // lcd.print("  << WRONG >>");
+    delay(2000);
+
+    // lcd.clear();
+    // lcd.setCursor(1, 0);
+    // lcd.print("  :Welcome:");
+    // lcd.setCursor(0, 1);
+    // lcd.print("PLEASE ENTER PIN");
+  }
 }
 
 void keypadEvent(KeypadEvent eKey)
@@ -144,56 +186,14 @@ break;
   }
 }
 
-void checkPassword()
+void setup()
 {
-  if (password.evaluate())
-  {
-    int i;
-    for (i = 1; i <= 2; i++)
-    {
-      // digitalWrite(buzzer, HIGH);
-      delay(70);
-      // digitalWrite(buzzer, LOW);
-      delay(70);
-    }
-    ilosc = 0;
+  Serial.begin(9600);
+  keypad.addEventListener(keypadEvent);
+  pinMode(LED_BUILTIN, OUTPUT);
+}
 
-    Serial.println("Success");
-
-    // digitalWrite(ledRed, LOW);
-    // digitalWrite(ledGreen, HIGH);
-
-    // lcd.clear();
-    // lcd.setCursor(0, 1);
-    // lcd.print(" << SUCCESS >>");
-  }
-  else
-  {
-    int i;
-    for (i = 1; i <= 1; i++)
-    {
-      // digitalWrite(buzzer, HIGH);
-      delay(200);
-      // digitalWrite(buzzer, LOW);
-      delay(200);
-    }
-    ilosc = 0;
-    password.reset();
-
-    Serial.println("Wrong");
-
-    // digitalWrite(ledGreen, LOW);
-    // digitalWrite(ledRed, HIGH);
-
-    // lcd.clear();
-    // lcd.setCursor(0, 1);
-    // lcd.print("  << WRONG >>");
-    delay(2000);
-
-    // lcd.clear();
-    // lcd.setCursor(1, 0);
-    // lcd.print("  :Welcome:");
-    // lcd.setCursor(0, 1);
-    // lcd.print("PLEASE ENTER PIN");
-  }
+void loop()
+{
+  keypad.getKey();
 }
