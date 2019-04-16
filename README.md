@@ -6,13 +6,13 @@ Ce répertoire contient tous mes projets avec des microcontrôleurs Arduino. Le 
 Dans chaque projet, le dossier *src* contient le sketch *main.cpp*. C'est ce fichier qui est téléversé vers le microcontrôleur :
 
 ````
-dossier-racine-du-projet/src/main.cpp
+<dossier-racine-du-projet>/src/main.cpp
 ````
 
 Dans quelques projets, des sketchs alternatifs sont également contenus dans le dossier *lib* :
 
 ````
-dossier-racine-du-projet/lib/sketch-secondaire.cpp
+<dossier-racine-du-projet>/lib/<sketch-secondaire>.cpp
 ````
 
 Pour utiliser ces sketchs, il faut copier-coller le contenu dans le fichier *main.cpp*, puis téléverser ce dernier.
