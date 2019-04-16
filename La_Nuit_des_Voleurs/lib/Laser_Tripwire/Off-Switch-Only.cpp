@@ -193,7 +193,7 @@ void sendVwArray()
 {
   updateVwArray();
 
-  for (size_t i = 0; i < 2; i++)
+  for (size_t i = 0; i < 10; i++)
   {
     vw_send((uint8_t *)vw_s_array, 8);
     vw_wait_tx();
