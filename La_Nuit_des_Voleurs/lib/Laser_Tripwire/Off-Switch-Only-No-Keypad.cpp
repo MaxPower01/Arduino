@@ -194,7 +194,7 @@ void loop()
   timeSinceProgramStarted = millis();
 
   // Allumage/éteignage du système :
-  // checkSystemSwitch();
+  checkSystemSwitch();
 
   // Si le système est allumé et que l'alarme n'est pas déclenchée, vérifie l'intensité de la lumière captée :
   if (systemArmed && !alarmTriggered)

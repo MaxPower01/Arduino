@@ -7,6 +7,7 @@
 const byte BUZZER_1 = 2;
 const byte BUZZER_2 = 3;
 const int VW_RECEIVE_PIN = 11;
+const byte SWITCH = 13;
 
 // État de l'alarme :
 bool alarm = false;
@@ -33,6 +34,7 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(BUZZER_1, OUTPUT);
   pinMode(BUZZER_2, OUTPUT);
+  pinMode(SWITCH, INPUT);
 
   vw_set_rx_pin(VW_RECEIVE_PIN);
   vw_setup(2000);
@@ -102,8 +104,17 @@ void loop()
         }
 
         digitalWrite(BUZZER_1, buzzerState);
+        digitalWrite(BUZZER_2, buzzerState);
         digitalWrite(LED_BUILTIN, buzzerState);
       }
     }
+  }
+
+  if (digitalRead(SWITCH) == HIGH) {
+    alarm = false;
+    alarmTriggered = false;
+        digitalWrite(BUZZER_1, LOW);
+        digitalWrite(BUZZER_2, LOW);
+        digitalWrite(LED_BUILTIN, LOW);
   }
 }
