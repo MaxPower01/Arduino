@@ -1,4 +1,4 @@
-// -------------------- FIL DE DÉCLENCHEMENT AU LASER (on/off swith) -------------------- //
+// -------------------- FIL DE DÉCLENCHEMENT AU LASER (off switch) -------------------- //
 
 #include <Arduino.h>
 #include <VirtualWire.h>
@@ -6,9 +6,11 @@
 #include <Password.h>
 
 // Pattes du Arduino :
-const byte SWITCH = 13;
 const byte LASER = 2;
+const byte LED_GREEN = 1;
+const byte LED_RED = 0;
 const int VW_TRANSMIT_PIN = 12;
+const byte SWITCH = 13;
 const byte LIGHT_SENSOR = A5;
 
 // Capteur de lumière :
@@ -18,7 +20,7 @@ const int THRESHOLD_LIGHT = 300;
 int light;
 
 // Délais et intervals utilisés dans le sketch :
-const long DELAY_SYSTEM_ACTIVATION = 500;
+const long DELAY_SYSTEM_ACTIVATION = 250;
 const long DELAY_TRIGGER_ALARM = 100;
 const long INTERVAL = 1000;
 
@@ -33,8 +35,9 @@ unsigned long timeSinceOffSwitchTouched = 0;
 bool offSwitchIsBeingTouched = false;
 
 // État du système :
-bool systemArmed = false;
+bool systemArmed = true;
 bool systemPaused = false;
+bool systemUnlocked = false;
 
 // Délai pour déclencher l'alarme :
 unsigned long timeWhenLightInputDropped = 0;
@@ -45,6 +48,8 @@ unsigned long lightInputDropped = false;
 bool somethingTouchedTheLaser = false;
 bool alarmTriggered = false;
 unsigned long timeWhenAlarmWasTriggered = 0;
+unsigned long timeSinceAlarmWasTriggered = 0;
+bool alarmHasBeenTriggered = false;
 
 // Temps depuis que le sketch a démarré :
 unsigned long timeSinceProgramStarted;
@@ -54,10 +59,9 @@ unsigned int vw_s_alarm, vw_s_value_2, vw_s_value_3, vw_s_value_4;
 uint8_t vw_s_array[8];
 
 // Password :
-#define Password_Length 4
-Password password = Password("1*5#3"); // password
-int dlugosc = 5;                       // length of the password
-int ilosc;                             // number of clicks
+Password password = Password("56794");
+int passwordLength = 5;
+int keypadInputLength;
 
 // Keypad :
 const byte ROWS = 4;
@@ -83,9 +87,16 @@ void checkPassword()
       // digitalWrite(buzzer, LOW);
       delay(70);
     }
-    ilosc = 0;
-
-    Serial.println("Success");
+    keypadInputLength = 0;
+    systemUnlocked = true;
+    digitalWrite(LED_GREEN, HIGH);
+    delay(250);
+    digitalWrite(LED_GREEN, LOW);
+    delay(250);
+    digitalWrite(LED_GREEN, HIGH);
+    delay(250);
+    digitalWrite(LED_GREEN, LOW);
+    // Serial.println("Success");
   }
   else
   {
@@ -95,10 +106,16 @@ void checkPassword()
       delay(200);
       delay(200);
     }
-    ilosc = 0;
+    keypadInputLength = 0;
     password.reset();
-    Serial.println("Wrong");
-    delay(2000);
+    digitalWrite(LED_RED, HIGH);
+    delay(250);
+    digitalWrite(LED_RED, LOW);
+    delay(250);
+    digitalWrite(LED_RED, HIGH);
+    delay(250);
+    digitalWrite(LED_RED, LOW);
+    delay(500);
   }
 }
 
@@ -115,31 +132,32 @@ void keypadEvent(KeypadEvent eKey)
       delay(50);
     }
 
-    Serial.print("Pressed: ");
-    Serial.println(eKey);
+    // Serial.print("Pressed: ");
+    // Serial.println(eKey);
 
     switch (eKey)
     {
     default:
-      ilosc = ilosc + 1;
+      keypadInputLength = keypadInputLength + 1;
       password.append(eKey);
     }
 
-    if (ilosc == dlugosc)
+    if (keypadInputLength == passwordLength)
     {
       delay(250);
       checkPassword();
-      ilosc = 0;
+      keypadInputLength = 0;
     }
   }
 }
 
 void setup()
 {
-  Serial.begin(9600);
+  // Serial.begin(9600);
 
   // Pattes du Arduino :
-  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(LED_RED, OUTPUT);
+  pinMode(LED_GREEN, OUTPUT);
   pinMode(SWITCH, INPUT);
   pinMode(LASER, OUTPUT);
   pinMode(LIGHT_SENSOR, INPUT);
@@ -155,6 +173,8 @@ void setup()
   vw_s_value_4 = 0;
 
   keypad.addEventListener(keypadEvent);
+
+  digitalWrite(LASER, HIGH);
 }
 
 void updateVwArray()
@@ -173,7 +193,7 @@ void sendVwArray()
 {
   updateVwArray();
 
-  for (size_t i = 0; i < 2; i++)
+  for (size_t i = 0; i < 10; i++)
   {
     vw_send((uint8_t *)vw_s_array, 8);
     vw_wait_tx();
@@ -190,73 +210,40 @@ void armSystem()
 void disarmSystem()
 {
   digitalWrite(LASER, LOW);
-  digitalWrite(LED_BUILTIN, LOW);
 
   somethingTouchedTheLaser = false;
-  alarmTriggered = false;
   systemArmed = false;
-  vw_s_alarm = 0;
-  sendVwArray();
 }
 
 void checkSystemSwitch()
 {
-  // ---------------------------------------- ON
-  // Pendant que le bouton est appuyé et que le système est éteint :
-  if (systemArmed == false && digitalRead(SWITCH) == HIGH)
+  // Pendant que le bouton est appuyé, que le système est éteint et que le mot de passe a été entré correctement,
+  // si le bouton n'a pas déjà été appuyé, prend en note le temps et signal que le bouton a déjà été appuyé :
+  if (digitalRead(SWITCH) == HIGH && systemUnlocked == true)
   {
-    // Si le bouton a déjà été appuyé :
     if (!onSwitchIsBeingTouched)
     {
-      // Prend en note le temps :
       timeWhenOnSwitchTouched = timeSinceProgramStarted;
-      // Signal que le bouton a déjà été appuyé :
       onSwitchIsBeingTouched = true;
     }
+    // Met à jour le temps écoulé depuis que le bouton a été appuyé la première fois.
+    // Si le temps écoulé depuis est plus grand que le délai, désactive le système :
     else
     {
-      // Met à jour le temps écoulé depuis que le bouton a été appuyé la première fois :
       timeSinceOnSwitchTouched = timeSinceProgramStarted - timeWhenOnSwitchTouched;
-
-      // Si le temps écoulé depuis est plus grand que le délai :
       if (timeSinceOnSwitchTouched >= DELAY_SYSTEM_ACTIVATION)
       {
-        // Active le système :
-        armSystem();
-
-        // Réinitialise l'état du bouton en spécifiant qu'il n'a maintenant plus été appuyé :
-        onSwitchIsBeingTouched = false;
+        systemArmed = false;
+        digitalWrite(LASER, LOW);
       }
     }
   }
+  // Dès que le bouton n'est plus appuyé, réinitialiser son état et réactive le système :
   else
   {
-    // Dès que le bouton n'est plus appuyé, réinitialiser son état :
     onSwitchIsBeingTouched = false;
-  }
-
-  // ---------------------------------------- OFF
-  if (systemArmed == true && digitalRead(SWITCH) == HIGH)
-  {
-    if (!offSwitchIsBeingTouched)
-    {
-      timeWhenOffSwitchTouched = timeSinceProgramStarted;
-      offSwitchIsBeingTouched = true;
-    }
-    else
-    {
-      timeSinceOffSwitchTouched = timeSinceProgramStarted - timeWhenOffSwitchTouched;
-
-      if (timeSinceOffSwitchTouched >= DELAY_SYSTEM_ACTIVATION)
-      {
-        disarmSystem();
-        offSwitchIsBeingTouched = false;
-      }
-    }
-  }
-  else
-  {
-    offSwitchIsBeingTouched = false;
+    systemArmed = true;
+    digitalWrite(LASER, HIGH);
   }
 }
 
@@ -288,10 +275,10 @@ void checkLightInput()
 
 void triggerAlarm()
 {
-  digitalWrite(LED_BUILTIN, HIGH);
   vw_s_alarm = 1;
   sendVwArray();
   alarmTriggered = true;
+  // Serial.print("ALARM");
 }
 
 void loop()
@@ -308,17 +295,33 @@ void loop()
   // Allumage/éteignage du système :
   checkSystemSwitch();
 
-  // Si le système est allumé :
-  if (systemArmed)
+  // Si le système est allumé et que l'alarme n'est pas déclenchée, vérifie l'intensité de la lumière captée :
+  if (systemArmed && !alarmTriggered)
   {
-    // Vérifie l'intensité de la lumière captée :
     checkLightInput();
 
-    // Si quelque chose a touché le laser sans que l'alarme soit délà active :
-    if (somethingTouchedTheLaser && !alarmTriggered)
+    // Si quelque chose a touché le laser déclenche l'alarme :
+    if (somethingTouchedTheLaser)
     {
-      // Déclenche l'alarme :
       triggerAlarm();
+    }
+  }
+  else if (alarmTriggered)
+  {
+    if (!alarmHasBeenTriggered)
+    {
+      timeWhenAlarmWasTriggered = timeSinceProgramStarted;
+      alarmHasBeenTriggered = true;
+    }
+    else
+    {
+      timeSinceAlarmWasTriggered = timeSinceProgramStarted - timeWhenAlarmWasTriggered;
+      if (timeSinceAlarmWasTriggered > 10000)
+      {
+        alarmHasBeenTriggered = false;
+        alarmTriggered = false;
+        somethingTouchedTheLaser = false;
+      }
     }
   }
 }

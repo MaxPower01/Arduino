@@ -1,4 +1,4 @@
-// -------------------- FIL DE DÉCLENCHEMENT AU LASER -------------------- //
+// -------------------- FIL DE DÉCLENCHEMENT AU LASER (off switch, no keypad) -------------------- //
 
 #include <Arduino.h>
 #include <VirtualWire.h>
